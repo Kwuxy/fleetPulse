@@ -4,8 +4,6 @@ from services.fleet_service.app.exceptions import InvalidTruckCapacity, InvalidP
 from services.fleet_service.app.models.truck import CreateTruckRequest, Truck, TruckStatus
 from services.fleet_service.app.repositories import truck_repository
 
-trucks: dict[str, Truck] = {}
-
 
 def create_truck(create_truck_request: CreateTruckRequest):
     if not _is_valid_capacity(create_truck_request.capacity_kg):
@@ -14,7 +12,7 @@ def create_truck(create_truck_request: CreateTruckRequest):
     if not _is_valid_plate_number(create_truck_request.plate_number):
         raise InvalidPlateNumber(create_truck_request.plate_number)
 
-    if truck_repository.get_truck_by_plate_number(create_truck_request.plate_number) is not None:
+    if _is_duplicate_plate_number(create_truck_request.plate_number):
         raise DuplicatePlateNumber(create_truck_request.plate_number)
 
     truck = Truck(
@@ -24,7 +22,6 @@ def create_truck(create_truck_request: CreateTruckRequest):
     )
 
     truck_repository.save_truck(truck)
-
     return truck
 
 def _generate_truck_id():
@@ -32,6 +29,9 @@ def _generate_truck_id():
 
 def _is_valid_plate_number(plate_number: str):
     return True  # TODO : Implement plate number validation
+
+def _is_duplicate_plate_number(plate_number: str):
+    return truck_repository.get_truck_by_plate_number(plate_number) is not None
 
 def _is_valid_capacity(capacity_kg: int):
     return capacity_kg > 0
