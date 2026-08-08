@@ -17,6 +17,6 @@ async def create_truck(request: CreateTruckRequest):
 
     return truck
 
-@router.get('/')
+@router.get('')
 async def get_trucks() -> list[Truck]:
     return truck_service.get_trucks()
