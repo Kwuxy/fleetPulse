@@ -1,0 +1,22 @@
+info:
+  name: Assign Truck to Delivery
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{baseURL}}/internal/truck-assignments"
+  body:
+    type: json
+    data: |-
+      {
+          "delivery_id": "delivery-123",
+          "cargo_weight_kg": 700,
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
