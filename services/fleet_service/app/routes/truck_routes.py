@@ -6,7 +6,7 @@ from services.fleet_service.app.services import truck_service
 
 router = APIRouter(prefix='/trucks', tags=['trucks'])
 
-@router.post('')
+@router.post('', status_code=201)
 async def create_truck(request: CreateTruckRequest):
     try:
         truck = truck_service.create_truck(request)
