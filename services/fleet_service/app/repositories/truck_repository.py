@@ -10,3 +10,8 @@ def get_trucks() -> list[Truck]:
 
 def clear() -> None:
     _trucks.clear()
+
+def get_truck_by_plate_number(plate_number: str) -> Truck | None:
+    truck_by_plate_number = filter(lambda t: t.plate_number == plate_number, list(_trucks.values()))
+    truck = next(truck_by_plate_number, None)
+    return truck

@@ -60,3 +60,22 @@ def test_create_truck_endpoint_rejects_invalid_capacity():
     )
 
     assert response.status_code == 400
+
+def test_create_truck_endpoint_rejects_duplicate_plate_number():
+    client.post(
+        "/trucks",
+        json={
+            "plate_number": "AB-123-CD",
+            "capacity_kg": 900,
+        },
+    )
+
+    response = client.post(
+        "/trucks",
+        json={
+            "plate_number": "AB-123-CD",
+            "capacity_kg": 1100,
+        },
+    )
+
+    assert response.status_code == 409

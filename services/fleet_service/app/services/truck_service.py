@@ -1,6 +1,6 @@
 import uuid
 
-from services.fleet_service.app.exceptions import InvalidTruckCapacity, InvalidPlateNumber
+from services.fleet_service.app.exceptions import InvalidTruckCapacity, InvalidPlateNumber, DuplicatePlateNumber
 from services.fleet_service.app.models.truck import CreateTruckRequest, Truck, TruckStatus
 from services.fleet_service.app.repositories import truck_repository
 
@@ -14,7 +14,8 @@ def create_truck(create_truck_request: CreateTruckRequest):
     if not _is_valid_plate_number(create_truck_request.plate_number):
         raise InvalidPlateNumber(create_truck_request.plate_number)
 
-    # Should validate plate number uniqueness here
+    if truck_repository.get_truck_by_plate_number(create_truck_request.plate_number) is not None:
+        raise DuplicatePlateNumber(create_truck_request.plate_number)
 
     truck = Truck(
         id=_generate_truck_id(),

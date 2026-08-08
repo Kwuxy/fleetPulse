@@ -1,6 +1,6 @@
 import pytest
 
-from services.fleet_service.app.exceptions import InvalidTruckCapacity
+from services.fleet_service.app.exceptions import InvalidTruckCapacity, DuplicatePlateNumber
 from services.fleet_service.app.models.truck import CreateTruckRequest, TruckStatus
 from services.fleet_service.app.repositories import truck_repository
 from services.fleet_service.app.services import truck_service
@@ -31,6 +31,17 @@ def test_create_truck_rejects_invalid_capacity():
     )
 
     with pytest.raises(InvalidTruckCapacity):
+        truck_service.create_truck(request)
+
+def test_create_truck_rejects_duplicate_plate_number():
+    request = CreateTruckRequest(
+        plate_number="AB-123-CD",
+        capacity_kg=1200,
+    )
+
+    truck_service.create_truck(request)
+
+    with pytest.raises(DuplicatePlateNumber):
         truck_service.create_truck(request)
 
 def test_get_trucks_returns_created_trucks():
