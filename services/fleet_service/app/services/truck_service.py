@@ -2,6 +2,7 @@ import uuid
 
 from services.fleet_service.app.exceptions import InvalidTruckCapacity, InvalidPlateNumber
 from services.fleet_service.app.models.truck import CreateTruckRequest, Truck, TruckStatus
+from services.fleet_service.app.repositories import truck_repository
 
 trucks: dict[str, Truck] = {}
 
@@ -21,7 +22,7 @@ def create_truck(create_truck_request: CreateTruckRequest):
         status=TruckStatus.AVAILABLE
     )
 
-    trucks[truck.id] = truck
+    truck_repository.save_truck(truck)
 
     return truck
 
@@ -35,4 +36,4 @@ def _is_valid_capacity(capacity_kg: int):
     return capacity_kg > 0
 
 def get_trucks() -> list[Truck]:
-    return list(trucks.values())
+    return truck_repository.get_trucks()
