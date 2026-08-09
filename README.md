@@ -32,7 +32,7 @@ pip install -e .
 ### 2. Start the Fleet Service
 From the project root, run:
 ```bash
-uvicorn services.fleet_service.app.main:app --reload --port 8001
+uvicorn apps.fleet_service.app.main:app --reload --port 8001
 ```
 
 The Fleet Service will be available at:
