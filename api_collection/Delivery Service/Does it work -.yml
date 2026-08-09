@@ -1,11 +1,11 @@
 info:
-  name: Get Trucks
+  name: Does it work ?
   type: http
   seq: 1
 
 http:
   method: GET
-  url: "{{baseURL}}/trucks"
+  url: "{{DELIVERY_URL}}/"
   auth: inherit
 
 settings:

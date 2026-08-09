@@ -1,17 +1,17 @@
 info:
-  name: Assign Truck to Delivery
+  name: Create Truck
   type: http
-  seq: 3
+  seq: 1
 
 http:
   method: POST
-  url: "{{baseURL}}/internal/truck-assignments"
+  url: "{{FLEET_URL}}/trucks"
   body:
     type: json
     data: |-
       {
-          "delivery_id": "delivery-123",
-          "cargo_weight_kg": 700,
+        "plate_number": "AB-123-CD",
+        "capacity_kg": 1200
       }
   auth: inherit
 

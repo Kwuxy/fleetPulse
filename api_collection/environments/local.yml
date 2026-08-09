@@ -1,5 +1,17 @@
 name: local
 variables:
-  - name: baseURL
-    value: 127.0.0.1:8000
-    description: ""
+  - name: base_url
+    value: 127.0.0.1
+    description: Base URL of the services
+  - name: fleet_service_port
+    value: "8001"
+    description: Fleet service port
+  - name: delivery_service_port
+    value: "8002"
+    description: Delivery service port
+  - name: FLEET_URL
+    value: "{{base_url}}:{{fleet_service_port}}"
+    description: Fleet service URL, ready to use
+  - name: DELIVERY_URL
+    value: "{{base_url}}:{{delivery_service_port}}"
+    description: Delivery service URL, ready to use

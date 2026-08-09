@@ -1,0 +1,15 @@
+info:
+  name: Get Trucks
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{FLEET_URL}}/trucks"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
