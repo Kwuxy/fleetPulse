@@ -1,7 +1,5 @@
 from fastapi import FastAPI
-
+from routes import delivery_routes
 app = FastAPI()
 
-@app.get('/')
-async def root():
-    return {'message': 'Hello World'}
+app.include_router(delivery_routes.router)
