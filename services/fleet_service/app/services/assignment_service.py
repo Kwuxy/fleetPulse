@@ -1,7 +1,7 @@
-from services.fleet_service.app.exceptions import UnknownDelivery, InvalidCargoWeight, NoTruckAvailable
-from services.fleet_service.app.models.assignment import TruckAssignmentRequest
-from services.fleet_service.app.models.truck import Truck, TruckStatus
-from services.fleet_service.app.repositories import assignment_repository, truck_repository
+from exceptions import UnknownDelivery, InvalidCargoWeight, NoTruckAvailable
+from models.assignment import TruckAssignmentRequest
+from models.truck import Truck, TruckStatus
+from repositories import assignment_repository, truck_repository
 
 
 def assign_truck_to_delivery(request: TruckAssignmentRequest) -> Truck:
