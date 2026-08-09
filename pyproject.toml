@@ -1,0 +1,17 @@
+[project]
+name = "fleet-pulse-workspace"
+version = "0.1.0"
+description = "Monorepo workspace for FleetPulse microservices"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.uv.workspace]
+members = ["apps/*"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["apps/fleet_service/test", "apps/delivery_service/test"]

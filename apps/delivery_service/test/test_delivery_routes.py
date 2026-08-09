@@ -2,9 +2,9 @@ import pytest
 from datetime import date, timedelta
 from fastapi.testclient import TestClient
 
-from apps.delivery_service.app.main import app
-from apps.delivery_service.app.repositories import delivery_repository
-from apps.delivery_service.app.services import delivery_service
+from main import app
+from clients import fleet_client
+from repositories import delivery_repository
 
 client = TestClient(app)
 
@@ -22,7 +22,7 @@ class TestDeliveryRoutes:
             return "truck-123"
 
         monkeypatch.setattr(
-            delivery_service.fleet_client,
+            fleet_client,
             "assign_truck_to_delivery",
             fake_assign_truck_to_delivery,
         )
@@ -55,7 +55,7 @@ class TestDeliveryRoutes:
             return None
 
         monkeypatch.setattr(
-            delivery_service.fleet_client,
+            fleet_client,
             "assign_truck_to_delivery",
             fake_assign_truck_to_delivery,
         )
@@ -84,7 +84,7 @@ class TestDeliveryRoutes:
             return "truck-123"
 
         monkeypatch.setattr(
-            delivery_service.fleet_client,
+            fleet_client,
             "assign_truck_to_delivery",
             fake_assign_truck_to_delivery,
         )
@@ -107,7 +107,7 @@ class TestDeliveryRoutes:
             return "truck-123"
 
         monkeypatch.setattr(
-            delivery_service.fleet_client,
+            fleet_client,
             "assign_truck_to_delivery",
             fake_assign_truck_to_delivery,
         )
@@ -130,7 +130,7 @@ class TestDeliveryRoutes:
             return "truck-123"
 
         monkeypatch.setattr(
-            delivery_service.fleet_client,
+            fleet_client,
             "assign_truck_to_delivery",
             fake_assign_truck_to_delivery,
         )

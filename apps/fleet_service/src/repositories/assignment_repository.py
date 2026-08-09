@@ -1,5 +1,5 @@
-from apps.fleet_service.app.models.truck import Truck, TruckStatus
-from apps.fleet_service.app.repositories import truck_repository
+from repositories import truck_repository
+from models.truck import Truck, TruckStatus
 
 
 def find_available_truck_for_capacity(min_capacity_kg: int) -> Truck | None:

@@ -1,4 +1,4 @@
-from apps.delivery_service.app.models.delivery import Delivery
+from models.delivery import Delivery
 
 
 _deliveries: dict[str, Delivery] = {}

@@ -1,8 +1,8 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from apps.fleet_service.app.main import app
-from apps.fleet_service.app.repositories import truck_repository
+from main import app
+from repositories import truck_repository
 
 client = TestClient(app)
 

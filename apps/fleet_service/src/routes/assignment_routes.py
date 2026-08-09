@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException
 
-from apps.fleet_service.app.models.assignment import TruckAssignmentRequest, TruckAssignmentResponse, TruckAssignmentFailureReason
-from apps.fleet_service.app.services import assignment_service
-from apps.fleet_service.app.exceptions import UnknownDelivery, InvalidCargoWeight, NoTruckAvailable
+from models.assignment import TruckAssignmentRequest, TruckAssignmentResponse, TruckAssignmentFailureReason
+from services import assignment_service
+from exceptions import UnknownDelivery, InvalidCargoWeight, NoTruckAvailable
 
 router = APIRouter(prefix='/internal/truck-assignments', tags=['truck-assignments'])
 

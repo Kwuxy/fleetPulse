@@ -1,9 +1,9 @@
 from fastapi import APIRouter, HTTPException
 from httpx import TimeoutException
 
-from apps.delivery_service.app.exceptions import InvalidClient, SameLocationsException, InvalidCargo, InvalidRequestedDate
-from apps.delivery_service.app.models.delivery import Delivery, CreateDeliveryRequest
-from apps.delivery_service.app.services import delivery_service
+from exceptions import InvalidClient, SameLocationsException, InvalidCargo, InvalidRequestedDate
+from models.delivery import Delivery, CreateDeliveryRequest
+from services import delivery_service
 
 router = APIRouter(prefix='/deliveries', tags=['deliveries'])
 

@@ -1,10 +1,10 @@
 import uuid
 from datetime import date
 
-from apps.delivery_service.app.clients import fleet_client
-from apps.delivery_service.app.exceptions import InvalidClient, SameLocationsException, InvalidCargo, InvalidRequestedDate
-from apps.delivery_service.app.models.delivery import Delivery, CreateDeliveryRequest, DeliveryStatus
-from apps.delivery_service.app.repositories import delivery_repository
+from clients import fleet_client
+from exceptions import InvalidClient, SameLocationsException, InvalidCargo, InvalidRequestedDate
+from models.delivery import Delivery, CreateDeliveryRequest, DeliveryStatus
+from repositories import delivery_repository
 
 
 async def create_delivery(request: CreateDeliveryRequest) -> Delivery:

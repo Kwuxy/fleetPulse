@@ -3,10 +3,11 @@ from datetime import date, timedelta
 
 import pytest
 
-from apps.delivery_service.app.exceptions import InvalidCargo, InvalidRequestedDate, SameLocationsException
-from apps.delivery_service.app.models.delivery import CreateDeliveryRequest, DeliveryStatus
-from apps.delivery_service.app.repositories import delivery_repository
-from apps.delivery_service.app.services import delivery_service
+from exceptions import InvalidCargo, InvalidRequestedDate, SameLocationsException
+from models.delivery import CreateDeliveryRequest, DeliveryStatus
+from repositories import delivery_repository
+from clients import fleet_client
+from services import delivery_service
 
 
 @pytest.fixture(autouse=True)
@@ -22,7 +23,7 @@ class TestDeliveryService:
             return "truck-123"
 
         monkeypatch.setattr(
-            delivery_service.fleet_client,
+            fleet_client,
             "assign_truck_to_delivery",
             fake_assign_truck_to_delivery,
         )
@@ -50,7 +51,7 @@ class TestDeliveryService:
             return None
 
         monkeypatch.setattr(
-            delivery_service.fleet_client,
+            fleet_client,
             "assign_truck_to_delivery",
             fake_assign_truck_to_delivery,
         )
@@ -74,7 +75,7 @@ class TestDeliveryService:
             return "truck-123"
 
         monkeypatch.setattr(
-            delivery_service.fleet_client,
+            fleet_client,
             "assign_truck_to_delivery",
             fake_assign_truck_to_delivery,
         )
@@ -95,7 +96,7 @@ class TestDeliveryService:
             return "truck-123"
 
         monkeypatch.setattr(
-            delivery_service.fleet_client,
+            fleet_client,
             "assign_truck_to_delivery",
             fake_assign_truck_to_delivery,
         )
@@ -116,7 +117,7 @@ class TestDeliveryService:
             return "truck-123"
 
         monkeypatch.setattr(
-            delivery_service.fleet_client,
+            fleet_client,
             "assign_truck_to_delivery",
             fake_assign_truck_to_delivery,
         )

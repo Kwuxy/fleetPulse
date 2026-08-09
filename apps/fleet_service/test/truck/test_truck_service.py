@@ -1,9 +1,9 @@
 import pytest
 
-from apps.fleet_service.app.exceptions import InvalidTruckCapacity, DuplicatePlateNumber
-from apps.fleet_service.app.models.truck import CreateTruckRequest, TruckStatus
-from apps.fleet_service.app.repositories import truck_repository
-from apps.fleet_service.app.services import truck_service
+from exceptions import InvalidTruckCapacity, DuplicatePlateNumber
+from models.truck import CreateTruckRequest, TruckStatus
+from repositories import truck_repository
+from services import truck_service
 
 
 @pytest.fixture(autouse=True)

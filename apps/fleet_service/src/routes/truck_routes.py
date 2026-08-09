@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException
 
-from apps.fleet_service.app.exceptions import InvalidPlateNumber, InvalidTruckCapacity, DuplicatePlateNumber
-from apps.fleet_service.app.models.truck import Truck, CreateTruckRequest
-from apps.fleet_service.app.services import truck_service
+from exceptions import InvalidPlateNumber, InvalidTruckCapacity, DuplicatePlateNumber
+from models.truck import Truck, CreateTruckRequest
+from services import truck_service
 
 router = APIRouter(prefix='/trucks', tags=['trucks'])
 
