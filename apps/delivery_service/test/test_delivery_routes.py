@@ -1,3 +1,5 @@
+from urllib import response
+
 import pytest
 from datetime import date, timedelta
 from fastapi.testclient import TestClient
@@ -147,3 +149,43 @@ class TestDeliveryRoutes:
         )
 
         assert response.status_code == 400
+
+    def test_get_deliveries_endpoint_returns_created_deliveries(self, monkeypatch):
+        async def fake_assign_truck_to_delivery(delivery_id: str, cargo_weight_kg: int) -> str:
+            return "truck-123"
+
+        monkeypatch.setattr(
+            fleet_client,
+            "assign_truck_to_delivery",
+            fake_assign_truck_to_delivery,
+        )
+
+        client.post(
+            "/deliveries",
+            json={
+                "client_id": 1,
+                "pickup_location": "Brussels",
+                "dropoff_location": "Paris",
+                "cargo_weight_kg": 700,
+                "requested_date": str(date.today() + timedelta(days=1)),
+            },
+        )
+
+        client.post(
+            "/deliveries",
+            json={
+                "client_id": 2,
+                "pickup_location": "Rome",
+                "dropoff_location": "Berlin",
+                "cargo_weight_kg": 900,
+                "requested_date": str(date.today() + timedelta(days=1)),
+            },
+        )
+
+        response = client.get("/deliveries")
+
+        assert response.status_code == 200
+        assert len(response.json()) == 2
+        assert response.json()[0]["pickup_location"] == "Brussels"
+        assert response.json()[1]["pickup_location"] == "Rome"
+

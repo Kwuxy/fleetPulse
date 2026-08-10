@@ -8,3 +8,6 @@ def save(delivery: Delivery) -> None:
 
 def clear() -> None:
     _deliveries.clear()
+
+def get_deliveries() -> list[Delivery]:
+    return list(_deliveries.values())

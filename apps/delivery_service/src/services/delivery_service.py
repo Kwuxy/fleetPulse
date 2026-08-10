@@ -52,3 +52,6 @@ def _date_is_valid(requested_date: date) -> bool:
 
 def _generate_delivery_id():
     return f"delivery-{uuid.uuid4().hex[:8]}"
+
+def get_deliveries() -> list[Delivery]:
+    return delivery_repository.get_deliveries()

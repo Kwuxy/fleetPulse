@@ -132,3 +132,36 @@ class TestDeliveryService:
 
         with pytest.raises(InvalidRequestedDate):
             asyncio.run(delivery_service.create_delivery(request))
+
+    def test_get_deliveries_returns_created_deliveries(self, monkeypatch):
+        async def fake_assign_truck_to_delivery(delivery_id: str, cargo_weight_kg: int) -> str:
+            return "truck-123"
+
+        monkeypatch.setattr(
+            fleet_client,
+            "assign_truck_to_delivery",
+            fake_assign_truck_to_delivery,
+        )
+
+        requests = [
+            CreateDeliveryRequest(
+                client_id=1,
+                pickup_location="Brussels",
+                dropoff_location="Paris",
+                cargo_weight_kg=700,
+                requested_date=date.today() + timedelta(days=1),
+            ),
+            CreateDeliveryRequest(
+                client_id=3,
+                pickup_location="Rome",
+                dropoff_location="Berlin",
+                cargo_weight_kg=900,
+                requested_date=date.today() + timedelta(days=1),
+            )
+        ]
+
+        deliveries = [asyncio.run(delivery_service.create_delivery(request)) for request in requests]
+        result = delivery_service.get_deliveries()
+
+        assert len(result) == 2
+        assert result == deliveries

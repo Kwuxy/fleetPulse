@@ -23,3 +23,7 @@ async def create_delivery(request: CreateDeliveryRequest) -> Delivery:
         raise HTTPException(status_code=503, detail=str(e))
 
     return delivery
+
+@router.get('')
+async def list_deliveries() -> list[Delivery]:
+    return delivery_service.get_deliveries()
