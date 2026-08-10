@@ -11,3 +11,6 @@ def clear() -> None:
 
 def get_deliveries() -> list[Delivery]:
     return list(_deliveries.values())
+
+def get_delivery_by_id(delivery_id: str) -> Delivery | None:
+    return _deliveries.get(delivery_id)

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from httpx import TimeoutException
 
-from exceptions import InvalidClient, SameLocationsException, InvalidCargo, InvalidRequestedDate
+from exceptions import InvalidClient, SameLocationsException, InvalidCargo, InvalidRequestedDate, NotFoundException
 from models.delivery import Delivery, CreateDeliveryRequest
 from services import delivery_service
 
@@ -27,3 +27,12 @@ async def create_delivery(request: CreateDeliveryRequest) -> Delivery:
 @router.get('')
 async def list_deliveries() -> list[Delivery]:
     return delivery_service.get_deliveries()
+
+@router.get('/{delivery_id}')
+async def get_delivery(delivery_id: str) -> Delivery:
+    try:
+        delivery = delivery_service.get_delivery_by_id(delivery_id)
+    except NotFoundException as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    return delivery

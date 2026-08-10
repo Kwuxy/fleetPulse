@@ -3,7 +3,7 @@ from datetime import date, timedelta
 
 import pytest
 
-from exceptions import InvalidCargo, InvalidRequestedDate, SameLocationsException
+from exceptions import InvalidCargo, InvalidRequestedDate, SameLocationsException, NotFoundException
 from models.delivery import CreateDeliveryRequest, DeliveryStatus
 from repositories import delivery_repository
 from clients import fleet_client
@@ -165,3 +165,65 @@ class TestDeliveryService:
 
         assert len(result) == 2
         assert result == deliveries
+
+    def test_get_deliveries_by_id_returns_created_deliveries(self, monkeypatch):
+        async def fake_assign_truck_to_delivery(delivery_id: str, cargo_weight_kg: int) -> str:
+            return "truck-123"
+
+        monkeypatch.setattr(
+            fleet_client,
+            "assign_truck_to_delivery",
+            fake_assign_truck_to_delivery,
+        )
+
+        requests = [
+            CreateDeliveryRequest(
+                client_id=1,
+                pickup_location="Brussels",
+                dropoff_location="Paris",
+                cargo_weight_kg=700,
+                requested_date=date.today() + timedelta(days=1),
+            ),
+            CreateDeliveryRequest(
+                client_id=3,
+                pickup_location="Rome",
+                dropoff_location="Berlin",
+                cargo_weight_kg=900,
+                requested_date=date.today() + timedelta(days=1),
+            )
+        ]
+
+        deliveries = [asyncio.run(delivery_service.create_delivery(request)) for request in requests]
+        result = delivery_service.get_delivery_by_id(deliveries[0].id)
+        assert result == deliveries[0]
+
+    def test_get_deliveries_by_id_with_wrong_id_raises_exception(self, monkeypatch):
+        async def fake_assign_truck_to_delivery(delivery_id: str, cargo_weight_kg: int) -> str:
+            return "truck-123"
+
+        monkeypatch.setattr(
+            fleet_client,
+            "assign_truck_to_delivery",
+            fake_assign_truck_to_delivery,
+        )
+
+        requests = [
+            CreateDeliveryRequest(
+                client_id=1,
+                pickup_location="Brussels",
+                dropoff_location="Paris",
+                cargo_weight_kg=700,
+                requested_date=date.today() + timedelta(days=1),
+            ),
+            CreateDeliveryRequest(
+                client_id=3,
+                pickup_location="Rome",
+                dropoff_location="Berlin",
+                cargo_weight_kg=900,
+                requested_date=date.today() + timedelta(days=1),
+            )
+        ]
+
+        deliveries = [asyncio.run(delivery_service.create_delivery(request)) for request in requests]
+        with pytest.raises(NotFoundException):
+            delivery_service.get_delivery_by_id('fake_id')

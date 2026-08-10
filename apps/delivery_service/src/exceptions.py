@@ -16,3 +16,7 @@ class InvalidCargo(Exception):
 class InvalidRequestedDate(Exception):
     def __init__(self, requested_date: date):
         super().__init__(f"Invalid requested date: {requested_date}. Requested date must be in the future.")
+
+class NotFoundException(Exception):
+    def __init__(self, delivery_id: str):
+        super().__init__(f"Delivery not found: {delivery_id}")

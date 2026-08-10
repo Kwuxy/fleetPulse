@@ -189,3 +189,64 @@ class TestDeliveryRoutes:
         assert response.json()[0]["pickup_location"] == "Brussels"
         assert response.json()[1]["pickup_location"] == "Rome"
 
+    def test_get_delivery_by_id_endpoint_returns_created_deliveries(self, monkeypatch):
+        async def fake_assign_truck_to_delivery(delivery_id: str, cargo_weight_kg: int) -> str:
+            return "truck-123"
+
+        monkeypatch.setattr(
+            fleet_client,
+            "assign_truck_to_delivery",
+            fake_assign_truck_to_delivery,
+        )
+
+        response = client.post(
+            "/deliveries",
+            json={
+                "client_id": 1,
+                "pickup_location": "Brussels",
+                "dropoff_location": "Paris",
+                "cargo_weight_kg": 700,
+                "requested_date": str(date.today() + timedelta(days=1)),
+            },
+        )
+
+        client.post(
+            "/deliveries",
+            json={
+                "client_id": 2,
+                "pickup_location": "Rome",
+                "dropoff_location": "Berlin",
+                "cargo_weight_kg": 900,
+                "requested_date": str(date.today() + timedelta(days=1)),
+            },
+        )
+
+        delivery_id = response.json()["id"]
+        response = client.get(f"/deliveries/{delivery_id}")
+
+        assert response.status_code == 200
+        assert response.json()["pickup_location"] == "Brussels"
+
+    def test_get_delivery_by_id_endpoint_returns_404(self, monkeypatch):
+        async def fake_assign_truck_to_delivery(delivery_id: str, cargo_weight_kg: int) -> str:
+            return "truck-123"
+
+        monkeypatch.setattr(
+            fleet_client,
+            "assign_truck_to_delivery",
+            fake_assign_truck_to_delivery,
+        )
+
+        client.post(
+            "/deliveries",
+            json={
+                "client_id": 1,
+                "pickup_location": "Brussels",
+                "dropoff_location": "Paris",
+                "cargo_weight_kg": 700,
+                "requested_date": str(date.today() + timedelta(days=1)),
+            },
+        )
+
+        response = client.get(f"/delivery/fake_id")
+        assert response.status_code == 404

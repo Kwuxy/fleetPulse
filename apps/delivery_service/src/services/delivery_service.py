@@ -2,7 +2,7 @@ import uuid
 from datetime import date
 
 from clients import fleet_client
-from exceptions import InvalidClient, SameLocationsException, InvalidCargo, InvalidRequestedDate
+from exceptions import InvalidClient, SameLocationsException, InvalidCargo, InvalidRequestedDate, NotFoundException
 from models.delivery import Delivery, CreateDeliveryRequest, DeliveryStatus
 from repositories import delivery_repository
 
@@ -55,3 +55,10 @@ def _generate_delivery_id():
 
 def get_deliveries() -> list[Delivery]:
     return delivery_repository.get_deliveries()
+
+def get_delivery_by_id(delivery_id: str) -> Delivery:
+    delivery = delivery_repository.get_delivery_by_id(delivery_id)
+    if not delivery:
+        raise NotFoundException(delivery_id)
+
+    return delivery
