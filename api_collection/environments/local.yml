@@ -1,7 +1,7 @@
 name: local
 variables:
   - name: base_url
-    value: 127.0.0.1
+    value: localhost
     description: Base URL of the services
   - name: fleet_service_port
     value: "8001"

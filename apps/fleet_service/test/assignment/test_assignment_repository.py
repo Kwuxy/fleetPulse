@@ -1,7 +1,7 @@
 import pytest
 
-from models.truck import Truck, TruckStatus
-from repositories import assignment_repository, truck_repository
+from app.models.truck import Truck, TruckStatus
+from app.repositories import assignment_repository, truck_repository
 
 
 @pytest.fixture(autouse=True)

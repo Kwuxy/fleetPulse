@@ -1,8 +1,8 @@
 import uuid
 
-from exceptions import InvalidTruckCapacity, InvalidPlateNumber, DuplicatePlateNumber
-from models.truck import CreateTruckRequest, Truck, TruckStatus
-from repositories import truck_repository
+from app.exceptions import InvalidTruckCapacity, InvalidPlateNumber, DuplicatePlateNumber
+from app.models.truck import CreateTruckRequest, Truck, TruckStatus
+from app.repositories import truck_repository
 
 
 def create_truck(create_truck_request: CreateTruckRequest):

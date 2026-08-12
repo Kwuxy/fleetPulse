@@ -1,4 +1,4 @@
-from models.truck import Truck
+from app.models.truck import Truck
 
 _trucks: dict[str, Truck] = {}
 

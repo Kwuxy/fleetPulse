@@ -1,10 +1,10 @@
 import pytest
 
-from exceptions import InvalidCargoWeight, NoTruckAvailable
-from models.assignment import TruckAssignmentRequest
-from models.truck import Truck, TruckStatus
-from repositories import truck_repository
-from services import assignment_service
+from app.exceptions import InvalidCargoWeight, NoTruckAvailable
+from app.models.assignment import TruckAssignmentRequest
+from app.models.truck import Truck, TruckStatus
+from app.repositories import truck_repository
+from app.services import assignment_service
 
 
 @pytest.fixture(autouse=True)

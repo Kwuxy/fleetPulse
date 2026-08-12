@@ -4,9 +4,9 @@ import pytest
 from datetime import date, timedelta
 from fastapi.testclient import TestClient
 
-from main import app
-from clients import fleet_client
-from repositories import delivery_repository
+from app.main import app
+from app.clients import fleet_client
+from app.repositories import delivery_repository
 
 client = TestClient(app)
 

@@ -1,7 +1,7 @@
-from exceptions import UnknownDelivery, InvalidCargoWeight, NoTruckAvailable
-from models.assignment import TruckAssignmentRequest
-from models.truck import Truck, TruckStatus
-from repositories import assignment_repository, truck_repository
+from app.exceptions import UnknownDelivery, InvalidCargoWeight, NoTruckAvailable
+from app.models.assignment import TruckAssignmentRequest
+from app.models.truck import Truck, TruckStatus
+from app.repositories import assignment_repository, truck_repository
 
 
 def assign_truck_to_delivery(request: TruckAssignmentRequest) -> Truck:

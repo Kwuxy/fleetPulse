@@ -1,13 +1,12 @@
 import asyncio
 from datetime import date, timedelta
-
 import pytest
 
-from exceptions import InvalidCargo, InvalidRequestedDate, SameLocationsException, NotFoundException
-from models.delivery import CreateDeliveryRequest, DeliveryStatus
-from repositories import delivery_repository
-from clients import fleet_client
-from services import delivery_service
+from app.exceptions import InvalidCargo, InvalidRequestedDate, SameLocationsException, NotFoundException
+from app.models.delivery import CreateDeliveryRequest, DeliveryStatus
+from app.repositories import delivery_repository
+from app.clients import fleet_client
+from app.services import delivery_service
 
 
 @pytest.fixture(autouse=True)

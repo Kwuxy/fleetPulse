@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from routes import truck_routes, assignment_routes
+from app.routes import truck_routes, assignment_routes
 
 app = FastAPI(title='Fleet Service')
 

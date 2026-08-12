@@ -1,8 +1,8 @@
 from datetime import date, timedelta
-
 import pytest
-from models.delivery import Delivery, DeliveryStatus
-from repositories import delivery_repository
+
+from app.models.delivery import Delivery, DeliveryStatus
+from app.repositories import delivery_repository
 
 
 @pytest.fixture(autouse=True)
