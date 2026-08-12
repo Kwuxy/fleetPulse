@@ -5,10 +5,10 @@ info:
 
 http:
   method: GET
-  url: "{{DELIVERY_URL}}/delivery/:id"
+  url: "{{DELIVERY_URL}}/deliveries/:id"
   params:
     - name: id
-      value: ""
+      value: delivery-fake
       type: path
   auth: inherit
 
