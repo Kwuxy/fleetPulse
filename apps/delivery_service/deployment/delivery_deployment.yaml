@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+ name: delivery-deployment
+spec:
+ replicas: 1
+ selector:
+   matchLabels:
+     app: delivery-service
+ template:
+   metadata:
+     labels:
+       app: delivery-service
+   spec:
+     containers:
+     - name: delivery-container
+       image: delivery_service_image:latest
+       ports:
+       - containerPort: 8002

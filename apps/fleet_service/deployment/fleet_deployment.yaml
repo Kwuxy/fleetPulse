@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+ name: fleet-deployment
+spec:
+ replicas: 1
+ selector:
+   matchLabels:
+     app: fleet-service
+ template:
+   metadata:
+     labels:
+       app: fleet-service
+   spec:
+     containers:
+     - name: fleet-container
+       image: fleet_service_image:latest
+       ports:
+       - containerPort: 8001
