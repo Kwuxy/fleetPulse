@@ -1,11 +1,14 @@
+import os
+
 import httpx
 from httpx import TimeoutException
+
+FLEET_SERVICE_URL = os.environ.get("FLEET_SERVICE_URL", "http://127.0.0.1:8001")
 
 
 async def assign_truck_to_delivery(delivery_id: str, cargo_weight_kg: int) -> str | None:
     async with httpx.AsyncClient() as client:
-        # TODO : Externalize the URL
-        url = "http://127.0.0.1:8001/internal/truck-assignments"
+        url = f"{FLEET_SERVICE_URL}/internal/truck-assignments"
         payload = {"delivery_id": delivery_id, "cargo_weight_kg": cargo_weight_kg}
         response = await client.post(url, json=payload)
         response_json = response.json()
