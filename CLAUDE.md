@@ -51,6 +51,12 @@ docker compose down
 ```
 See `DEPLOYMENT.md` for details on both options.
 
+**Check Kafka topics were created (after `docker compose up`):**
+```bash
+docker compose logs kafka_init
+docker compose exec kafka kafka-topics --list --bootstrap-server localhost:9092
+```
+
 ## Architecture
 
 Two independent microservices with in-memory storage (no database).
@@ -66,7 +72,18 @@ Manages deliveries. Same layer structure, plus a `fleet_client` that makes async
 - On delivery creation, it calls Fleet Service to assign a truck; delivery status becomes `ASSIGNED` or `DENIED`.
 
 ### Inter-service communication
-`delivery_service/app/clients/fleet_client.py` uses `httpx` (async) to call Fleet Service. The base URL comes from the `FLEET_SERVICE_URL` env var (defaults to `http://127.0.0.1:8001` for local, non-containerized runs).
+`delivery_service/app/clients/fleet_client.py` uses `httpx` (async) to call Fleet Service. The base URL comes from the `FLEET_SERVICE_URL` env var (defaults to `http://127.0.0.1:8001` for local, non-containerized runs). This is still the live path for truck assignment today — Kafka (below) is running alongside it but not yet wired into the assignment flow.
+
+### Kafka
+A single-node broker (`confluentinc/cp-kafka`, KRaft mode — no Zookeeper) runs as the `kafka` service in `docker-compose.yml`, with a combined `broker,controller` role. It exposes one client listener (`CLIENT`, internal to the compose network only — nothing is published to the host) and one `CONTROLLER` listener for KRaft's internal Raft consensus.
+
+Topics are created explicitly and automatically on startup by a one-shot `kafka_init` service, which runs `infra/kafka/create_topics.sh` (a POSIX `sh` script, idempotent via `--if-not-exists`) once `kafka` reports healthy, then exits. Both app services `depends_on` both `kafka` (`condition: service_healthy`) and `kafka_init` (`condition: service_completed_successfully`), so they don't start until the broker is up and topics exist.
+
+Topics defined so far (1 partition, replication factor 1 — single-broker local setup):
+- `truck-assignment-requested` — intended: Delivery Service produces, Fleet Service consumes
+- `truck-assignment-completed` — intended: Fleet Service produces, Delivery Service consumes
+
+These aren't produced/consumed by application code yet — see Project Status below.
 
 ### Data models
 - **Truck:** `id`, `plate_number`, `capacity_kg`, `status` (`AVAILABLE` / `IN_USE` / `IN_REPAIR`)
@@ -104,6 +121,10 @@ apps/
     test/
     deployment/
 api_collection/         # Bruno API collection (YAML)
+infra/
+  kafka/
+    create_topics.sh    # explicit, versioned topic creation — run automatically by the kafka_init service
+docker-compose.yml       # fleet_service, delivery_service, kafka (KRaft), kafka_init
 ```
 
 ## Project Status
@@ -114,11 +135,14 @@ api_collection/         # Bruno API collection (YAML)
 - All routes, services, and repositories covered by pytest
 - Local deployment via Kubernetes (`deploy-local.bat` / `shutdown-local.bat`) and via Docker Compose (`docker-compose.yml`)
 - Fleet Service URL externalized via `FLEET_SERVICE_URL` env var (was previously hardcoded)
+- Local Kafka broker (single-node, KRaft mode) added to `docker-compose.yml`, with the two truck-assignment topics created explicitly and automatically via the `kafka_init` service — see Architecture > Kafka
 
-**In progress:**
-- Kafka integration for async event-driven communication between services (topics, producers, consumers)
-- Updating Docker images and `docker-compose.yml` to include a Kafka service
-- Integration tests for Kafka interactions
+**In progress / Next up:**
+- Define what "tests for Kafka" means for this project, then add them
+- Move truck assignment from the synchronous `fleet_client` HTTP call to the `truck-assignment-requested` / `truck-assignment-completed` Kafka topics, and test it
+- Move `deploy-local.bat`, `shutdown-local.bat`, and `DEPLOYMENT.md` under `infra/`
+- Externalize the Kafka URL in `infra/kafka/create_topics.sh` via an env var instead of the hardcoded `kafka:9092` (already flagged by a `TODO` in the script)
+- Add persistence for Fleet/Delivery Services (currently in-memory only, lost on restart) and for Kafka (currently no volume, flagged by the `TODO` in `docker-compose.yml`)
 
-**Next up:**
+**Later:**
 - Monitoring and logging (e.g., Prometheus/Grafana, ELK stack)
