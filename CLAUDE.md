@@ -40,8 +40,8 @@ pytest -m "unit and not integration"
 
 **Deploy to local Kubernetes (Docker Desktop required):**
 ```bash
-./deploy-local.bat   # builds images, deploys, starts port-forwarding
-./shutdown-local.bat # tears everything down
+./infra/k8s/deploy-local.bat   # builds images, deploys, starts port-forwarding
+./infra/k8s/shutdown-local.bat # tears everything down
 ```
 
 **Run with Docker Compose (lighter-weight alternative to Kubernetes):**
@@ -49,7 +49,7 @@ pytest -m "unit and not integration"
 docker compose up --build
 docker compose down
 ```
-See `DEPLOYMENT.md` for details on both options.
+See `infra/DEPLOYMENT.md` for details on both options.
 
 **Check Kafka topics were created (after `docker compose up`):**
 ```bash
@@ -126,6 +126,10 @@ api_collection/         # Bruno API collection (YAML)
 infra/
   kafka/
     create_topics.sh    # explicit, versioned topic creation — run automatically by the kafka_init service
+  k8s/
+    deploy-local.bat    # builds images, deploys to K8s, starts port-forwarding
+    shutdown-local.bat  # tears down the K8s deployment
+  DEPLOYMENT.md         # local dev setup: Docker Compose vs Kubernetes
 docker-compose.yml       # fleet_service, delivery_service, kafka (KRaft), kafka_init, redpanda_console
 ```
 
@@ -135,7 +139,7 @@ docker-compose.yml       # fleet_service, delivery_service, kafka (KRaft), kafka
 - Fleet Service — create truck (`POST /trucks`), list trucks (`GET /trucks`), internal truck assignment (`POST /internal/truck-assignments`)
 - Delivery Service — create delivery (`POST /deliveries`), list deliveries (`GET /deliveries`), get delivery by id (`GET /deliveries/{id}`)
 - All routes, services, and repositories covered by pytest
-- Local deployment via Kubernetes (`deploy-local.bat` / `shutdown-local.bat`) and via Docker Compose (`docker-compose.yml`)
+- Local deployment via Kubernetes (`infra/k8s/deploy-local.bat` / `infra/k8s/shutdown-local.bat`) and via Docker Compose (`docker-compose.yml`)
 - Fleet Service URL externalized via `FLEET_SERVICE_URL` env var (was previously hardcoded)
 - Local Kafka broker (single-node, KRaft mode) added to `docker-compose.yml`, with the two truck-assignment topics created explicitly and automatically via the `kafka_init` service — see Architecture > Kafka
 - Redpanda Console added to `docker-compose.yml` and verified against a running stack (`http://localhost:8080`, correctly sees both truck-assignment topics) — see Architecture > Kafka
@@ -143,7 +147,6 @@ docker-compose.yml       # fleet_service, delivery_service, kafka (KRaft), kafka
 **In progress / Next up:**
 - Define what "tests for Kafka" means for this project, then add them
 - Move truck assignment from the synchronous `fleet_client` HTTP call to the `truck-assignment-requested` / `truck-assignment-completed` Kafka topics, and test it
-- Move `deploy-local.bat`, `shutdown-local.bat`, and `DEPLOYMENT.md` under `infra/`
 - Externalize the Kafka URL in `infra/kafka/create_topics.sh` via an env var instead of the hardcoded `kafka:9092` (already flagged by a `TODO` in the script)
 - Add persistence for Fleet/Delivery Services (currently in-memory only, lost on restart) and for Kafka (currently no volume, flagged by the `TODO` in `docker-compose.yml`)
 

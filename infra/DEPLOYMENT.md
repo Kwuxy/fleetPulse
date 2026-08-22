@@ -50,7 +50,7 @@ docker compose up --build --force-recreate  # rebuild from scratch
 
 #### Option 2: Manual Batch Script
 ```bash
-./deploy-local.bat
+./infra/k8s/deploy-local.bat
 ```
 
 ### What Happens
@@ -61,7 +61,7 @@ docker compose up --build --force-recreate  # rebuild from scratch
 
 ### Stopping the Deployment
 ```bash
-./shutdown-local.bat
+./infra/k8s/shutdown-local.bat
 ```
 Or, in PyCharm: click the red Stop button.
 

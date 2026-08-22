@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 
-set "PROJECT_ROOT=%~dp0"
+set "PROJECT_ROOT=%~dp0..\..\"
 set "FLEET_DIR=%PROJECT_ROOT%apps\fleet_service"
 set "DELIVERY_DIR=%PROJECT_ROOT%apps\delivery_service"
 
