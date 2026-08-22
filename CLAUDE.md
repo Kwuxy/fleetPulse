@@ -85,6 +85,8 @@ Topics defined so far (1 partition, replication factor 1 — single-broker local
 
 These aren't produced/consumed by application code yet — see Project Status below.
 
+A `redpanda_console` service (Redpanda Console, image `docker.redpanda.com/redpandadata/console`) is also in `docker-compose.yml`, giving a web UI at `http://localhost:8080` for browsing topics/messages and consumer groups on the local broker. It connects to `kafka:9092` and waits on the same `kafka` (healthy) / `kafka_init` (completed) conditions as the app services.
+
 ### Data models
 - **Truck:** `id`, `plate_number`, `capacity_kg`, `status` (`AVAILABLE` / `IN_USE` / `IN_REPAIR`)
 - **Delivery:** `id`, `client_id`, `pickup_location`, `dropoff_location`, `cargo_weight_kg`, `requested_date`, `status` (`REQUESTED` / `ASSIGNED` / `DENIED` / `COMPLETED`), `assigned_truck_id`
@@ -124,7 +126,7 @@ api_collection/         # Bruno API collection (YAML)
 infra/
   kafka/
     create_topics.sh    # explicit, versioned topic creation — run automatically by the kafka_init service
-docker-compose.yml       # fleet_service, delivery_service, kafka (KRaft), kafka_init
+docker-compose.yml       # fleet_service, delivery_service, kafka (KRaft), kafka_init, redpanda_console
 ```
 
 ## Project Status
@@ -136,6 +138,7 @@ docker-compose.yml       # fleet_service, delivery_service, kafka (KRaft), kafka
 - Local deployment via Kubernetes (`deploy-local.bat` / `shutdown-local.bat`) and via Docker Compose (`docker-compose.yml`)
 - Fleet Service URL externalized via `FLEET_SERVICE_URL` env var (was previously hardcoded)
 - Local Kafka broker (single-node, KRaft mode) added to `docker-compose.yml`, with the two truck-assignment topics created explicitly and automatically via the `kafka_init` service — see Architecture > Kafka
+- Redpanda Console added to `docker-compose.yml` and verified against a running stack (`http://localhost:8080`, correctly sees both truck-assignment topics) — see Architecture > Kafka
 
 **In progress / Next up:**
 - Define what "tests for Kafka" means for this project, then add them
