@@ -1,9 +1,9 @@
-FROM python:3.14-alpine AS builder
+FROM python:3.14-slim AS builder
 WORKDIR /code
 COPY ./requirements.txt /code/requirements.txt
 RUN pip install --no-cache-dir --upgrade --user -r /code/requirements.txt
 
-FROM python:3.14-alpine
+FROM python:3.14-slim
 WORKDIR /code
 COPY --from=builder /root/.local /root/.local
 COPY app /code/app
