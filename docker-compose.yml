@@ -18,6 +18,7 @@ services:
       - "8002:8002"
     environment:
       - FLEET_SERVICE_URL=http://fleet_service:8001
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     volumes:
       - ./apps/delivery_service/app:/code/app  # Volume for hot reloading
     command: uvicorn app.main:app --host 0.0.0.0 --port 8002 --reload
@@ -31,15 +32,17 @@ services:
 
   kafka:
     image: confluentinc/cp-kafka:latest
+    ports:
+      - "9094:9094"
     environment:
       KAFKA_NODE_ID: 1
       CLUSTER_ID: msnpmGRoRQec4cZinkNi4Q
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
-      KAFKA_LISTENERS: CLIENT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
-      KAFKA_ADVERTISED_LISTENERS: CLIENT://kafka:9092
+      KAFKA_LISTENERS: CLIENT://0.0.0.0:9092,EXTERNAL://0.0.0.0:9094,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: CLIENT://kafka:9092,EXTERNAL://localhost:9094
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CLIENT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CLIENT:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: CLIENT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 #      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1

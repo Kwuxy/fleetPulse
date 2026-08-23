@@ -1,7 +1,7 @@
 import uuid
 from datetime import date
 
-from app.clients import fleet_client
+from app.clients import fleet_client, kafka_client
 from app.exceptions import InvalidClient, SameLocationsException, InvalidCargo, InvalidRequestedDate, NotFoundException
 from app.models.delivery import Delivery, CreateDeliveryRequest, DeliveryStatus
 from app.repositories import delivery_repository
@@ -27,14 +27,16 @@ async def create_delivery(request: CreateDeliveryRequest) -> Delivery:
         assigned_truck_id=None
     )
 
-    truck_id = await fleet_client.assign_truck_to_delivery(delivery.id, delivery.cargo_weight_kg)
-    if truck_id:
-        delivery.assigned_truck_id = truck_id
-        delivery.status = DeliveryStatus.ASSIGNED
-    else:
-        delivery.status = DeliveryStatus.DENIED
+    # truck_id = await fleet_client.assign_truck_to_delivery(delivery.id, delivery.cargo_weight_kg)
+    # if truck_id:
+    #     delivery.assigned_truck_id = truck_id
+    #     delivery.status = DeliveryStatus.ASSIGNED
+    # else:
+    #     delivery.status = DeliveryStatus.DENIED
 
     delivery_repository.save(delivery)
+
+    await kafka_client.produce_truck_assignment_requested(delivery.id, delivery.cargo_weight_kg)
     return delivery
 
 def _client_exist(client_id: int) -> bool:
