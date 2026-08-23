@@ -13,6 +13,18 @@ config:
         username: ""
         password: ""
       bypassProxy: ""
+
+request:
+  scripts:
+    - type: before-request
+      code: |-
+        const moment = require("moment");
+
+        function generate_date(days) {
+          return moment().add(days, 'days').format("YYYY-MM-DD");
+        }
+
+        bru.setVar("tomorrow", generate_date(1));
 bundled: false
 extensions:
   bruno:
