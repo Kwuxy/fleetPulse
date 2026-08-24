@@ -3,6 +3,8 @@ services:
     build: ./apps/fleet_service
     ports:
       - "8001:8001"
+    environment:
+      - LOG_LEVEL=INFO
     volumes:
       - ./apps/fleet_service/app:/code/app  # Volume for hot reloading
     command: uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
@@ -19,6 +21,7 @@ services:
     environment:
       - FLEET_SERVICE_URL=http://fleet_service:8001
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - LOG_LEVEL=INFO
     volumes:
       - ./apps/delivery_service/app:/code/app  # Volume for hot reloading
     command: uvicorn app.main:app --host 0.0.0.0 --port 8002 --reload
