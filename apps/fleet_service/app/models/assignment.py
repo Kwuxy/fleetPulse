@@ -10,7 +10,7 @@ class TruckAssignmentRequest(BaseModel):
 class TruckAssignmentFailureReason(str, Enum):
     NO_AVAILABLE_TRUCK = "NO_AVAILABLE_TRUCK"
 
-class TruckAssignmentResponse(BaseModel):
+class TruckAssignmentCompleted(BaseModel):
     truck_id: str | None = None
     assigned: bool
     reason: TruckAssignmentFailureReason | None = None
