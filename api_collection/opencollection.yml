@@ -24,7 +24,20 @@ request:
           return moment().add(days, 'days').format("YYYY-MM-DD");
         }
 
+        function generate_license_plate() {
+          function generate_letter() {
+            return String.fromCharCode(Math.floor(Math.random() * 26) + 65);
+          }
+          
+          function generate_number() {
+            return Math.floor(Math.random() * 10);
+          }
+          
+          return `${generate_letter()}${generate_letter()}-${generate_number()}${generate_number()}${generate_number()}-${generate_letter()}${generate_letter()}`;
+        }
+
         bru.setVar("tomorrow", generate_date(1));
+        bru.setVar("license_plate", generate_license_plate());
 bundled: false
 extensions:
   bruno:
