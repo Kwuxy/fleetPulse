@@ -18,8 +18,10 @@ logging.basicConfig(
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await kafka_client.start_consuming(assignment_consumer.handle_truck_assignment_requested)
+    await kafka_client.start_producer()
     yield
     await kafka_client.stop_consuming()
+    await kafka_client.stop_producer()
 
 app = FastAPI(lifespan=lifespan, title='Fleet Service')
 

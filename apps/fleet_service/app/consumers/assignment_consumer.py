@@ -6,6 +6,7 @@ from app.services import assignment_service
 from app.clients.kafka_client import QueueMessageStatus
 from app.models.assignment import TruckAssignmentRequest, TruckAssignmentCompleted, TruckAssignmentFailureReason
 from app.exceptions import UnknownDelivery, InvalidCargoWeight, NoTruckAvailable
+from app.producers.assignment_producer import produce_truck_assignment_completed
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,7 @@ async def handle_truck_assignment_requested(msg: dict) -> QueueMessageStatus:
         logger.info(f'Assigned truck: {truck.id}')
     except (UnknownDelivery, InvalidCargoWeight) as e:
         logger.warning(f'Truck not assigned, {e}')
-        produce_truck_assignment_completed(
+        await produce_truck_assignment_completed(
             TruckAssignmentCompleted.get_failed(
                 delivery_id=request.delivery_id,
                 reason=TruckAssignmentFailureReason.INVALID_REQUEST,
@@ -33,7 +34,7 @@ async def handle_truck_assignment_requested(msg: dict) -> QueueMessageStatus:
         return QueueMessageStatus.CONSUMED
     except NoTruckAvailable as e:
         logger.warning(f'Truck not assigned, {e}')
-        produce_truck_assignment_completed(
+        await produce_truck_assignment_completed(
             TruckAssignmentCompleted.get_failed(
                 delivery_id=request.delivery_id,
                 reason=TruckAssignmentFailureReason.NO_AVAILABLE_TRUCK,
@@ -42,11 +43,7 @@ async def handle_truck_assignment_requested(msg: dict) -> QueueMessageStatus:
         )
         return QueueMessageStatus.CONSUMED
 
-    produce_truck_assignment_completed(
+    await produce_truck_assignment_completed(
         TruckAssignmentCompleted.get_success(delivery_id=request.delivery_id, truck_id=truck.id)
     )
     return QueueMessageStatus.CONSUMED
-
-# TODO : Implement this function & move to producer module
-def produce_truck_assignment_completed(truck_assignment_completed: TruckAssignmentCompleted):
-    logger.info(f'Producing truck assignment completed: {truck_assignment_completed}')
