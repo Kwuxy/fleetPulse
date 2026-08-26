@@ -6,6 +6,7 @@ from typing import AsyncIterator
 from fastapi import FastAPI
 from app.routes import delivery_routes
 from app.clients import kafka_client
+from app.consumers import assignment_consumer
 
 logging.basicConfig(
     level=os.environ.get("LOG_LEVEL", "INFO"),
@@ -15,8 +16,10 @@ logging.basicConfig(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    await kafka_client.start_consuming(assignment_consumer.handle_truck_assignment_completed)
     await kafka_client.start_producer()
     yield
+    await kafka_client.stop_consuming()
     await kafka_client.stop_producer()
 
 app = FastAPI(lifespan=lifespan, title='Delivery Service')

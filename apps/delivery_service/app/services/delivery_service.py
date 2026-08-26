@@ -1,10 +1,11 @@
 import uuid
 from datetime import date
 
-from app.clients import fleet_client, kafka_client
+from app.clients import kafka_client
 from app.exceptions import InvalidClient, SameLocationsException, InvalidCargo, InvalidRequestedDate, NotFoundException
 from app.models.delivery import Delivery, CreateDeliveryRequest, DeliveryStatus
 from app.repositories import delivery_repository
+from app.models.truck_assignment import TruckAssignmentCompleted
 
 
 async def create_delivery(request: CreateDeliveryRequest) -> Delivery:
@@ -27,17 +28,16 @@ async def create_delivery(request: CreateDeliveryRequest) -> Delivery:
         assigned_truck_id=None
     )
 
-    # truck_id = await fleet_client.assign_truck_to_delivery(delivery.id, delivery.cargo_weight_kg)
-    # if truck_id:
-    #     delivery.assigned_truck_id = truck_id
-    #     delivery.status = DeliveryStatus.ASSIGNED
-    # else:
-    #     delivery.status = DeliveryStatus.DENIED
-
     delivery_repository.save(delivery)
 
     await kafka_client.produce_truck_assignment_requested(delivery.id, delivery.cargo_weight_kg)
     return delivery
+
+def update_delivery_with_truck_assignment(assignment: TruckAssignmentCompleted) -> None:
+    delivery = get_delivery_by_id(assignment.delivery_id)
+    delivery.assigned_truck_id = assignment.truck_id
+    delivery.status = DeliveryStatus.ASSIGNED if assignment.assigned else DeliveryStatus.DENIED
+    delivery_repository.save(delivery)
 
 def _client_exist(client_id: int) -> bool:
     return True
@@ -47,7 +47,6 @@ def _locations_are_different(pickup_location: str, dropoff_location: str) -> boo
 
 def _cargo_is_valid(cargo_weight_kg: int) -> bool:
     return cargo_weight_kg > 0
-
 
 def _date_is_valid(requested_date: date) -> bool:
     return requested_date > date.today()
