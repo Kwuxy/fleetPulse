@@ -13,30 +13,37 @@ logger = logging.getLogger(__name__)
 async def handle_truck_assignment_requested(msg: dict) -> QueueMessageStatus:
     try:
         request = TruckAssignmentRequest(**msg)
-        truck = assignment_service.assign_truck_to_delivery(request)
-        logger.info(f'Assigned truck: {truck.id}')
     except ValidationError as e:
         # TODO : ValidationError should go to a dead-letter topic
         logger.warning(f'Invalid request: {e}')
         return QueueMessageStatus.CONSUMED
+
+    try:
+        truck = assignment_service.assign_truck_to_delivery(request)
+        logger.info(f'Assigned truck: {truck.id}')
     except (UnknownDelivery, InvalidCargoWeight) as e:
         logger.warning(f'Truck not assigned, {e}')
         produce_truck_assignment_completed(
-            TruckAssignmentCompleted.get_failed(reason=TruckAssignmentFailureReason.INVALID_REQUEST)
+            TruckAssignmentCompleted.get_failed(
+                delivery_id=request.delivery_id,
+                reason=TruckAssignmentFailureReason.INVALID_REQUEST
+            )
         )
         return QueueMessageStatus.CONSUMED
     except NoTruckAvailable as e:
         logger.warning(f'Truck not assigned, {e}')
         produce_truck_assignment_completed(
-            TruckAssignmentCompleted.get_failed(reason=TruckAssignmentFailureReason.NO_AVAILABLE_TRUCK)
+            TruckAssignmentCompleted.get_failed(
+                delivery_id=request.delivery_id,
+                reason=TruckAssignmentFailureReason.NO_AVAILABLE_TRUCK
+            )
         )
         return QueueMessageStatus.CONSUMED
 
     # TODO : Add description attribute to TruckAssignmentCompleted & put exception message when failed ?
-    # TODO : Add delivery_id to TruckAssignmentCompleted
 
     produce_truck_assignment_completed(
-        TruckAssignmentCompleted.get_success(truck_id=truck.id)
+        TruckAssignmentCompleted.get_success(delivery_id=request.delivery_id, truck_id=truck.id)
     )
     return QueueMessageStatus.CONSUMED
 
