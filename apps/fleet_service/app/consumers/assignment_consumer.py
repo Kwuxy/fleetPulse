@@ -26,7 +26,8 @@ async def handle_truck_assignment_requested(msg: dict) -> QueueMessageStatus:
         produce_truck_assignment_completed(
             TruckAssignmentCompleted.get_failed(
                 delivery_id=request.delivery_id,
-                reason=TruckAssignmentFailureReason.INVALID_REQUEST
+                reason=TruckAssignmentFailureReason.INVALID_REQUEST,
+                description=str(e)
             )
         )
         return QueueMessageStatus.CONSUMED
@@ -35,12 +36,11 @@ async def handle_truck_assignment_requested(msg: dict) -> QueueMessageStatus:
         produce_truck_assignment_completed(
             TruckAssignmentCompleted.get_failed(
                 delivery_id=request.delivery_id,
-                reason=TruckAssignmentFailureReason.NO_AVAILABLE_TRUCK
+                reason=TruckAssignmentFailureReason.NO_AVAILABLE_TRUCK,
+                description=str(e)
             )
         )
         return QueueMessageStatus.CONSUMED
-
-    # TODO : Add description attribute to TruckAssignmentCompleted & put exception message when failed ?
 
     produce_truck_assignment_completed(
         TruckAssignmentCompleted.get_success(delivery_id=request.delivery_id, truck_id=truck.id)

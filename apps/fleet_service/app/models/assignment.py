@@ -15,10 +15,11 @@ class TruckAssignmentCompleted(BaseModel):
     truck_id: str | None = None
     assigned: bool
     reason: TruckAssignmentFailureReason | None = None
+    description: str | None = None
 
     @staticmethod
-    def get_failed(delivery_id: str, reason: TruckAssignmentFailureReason) -> TruckAssignmentCompleted:
-        return TruckAssignmentCompleted(delivery_id=delivery_id, truck_id=None, assigned=False, reason=reason)
+    def get_failed(delivery_id: str, reason: TruckAssignmentFailureReason, description: str | None = None) -> TruckAssignmentCompleted:
+        return TruckAssignmentCompleted(delivery_id=delivery_id, truck_id=None, assigned=False, reason=reason, description=description)
 
     @staticmethod
     def get_success(delivery_id: str, truck_id: str) -> TruckAssignmentCompleted:
