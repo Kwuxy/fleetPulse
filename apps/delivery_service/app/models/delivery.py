@@ -18,6 +18,8 @@ class Delivery(BaseModel):
     requested_date: date
     status: DeliveryStatus
     assigned_truck_id: str | None
+    denial_reason: str | None = None
+    denial_description: str | None = None
 
 class CreateDeliveryRequest(BaseModel):
     client_id: int

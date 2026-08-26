@@ -37,7 +37,13 @@ async def create_delivery(request: CreateDeliveryRequest) -> Delivery:
 def update_delivery_with_truck_assignment(assignment: TruckAssignmentCompleted) -> None:
     delivery = get_delivery_by_id(assignment.delivery_id)
     delivery.assigned_truck_id = assignment.truck_id
-    delivery.status = DeliveryStatus.ASSIGNED if assignment.assigned else DeliveryStatus.DENIED
+    if assignment.assigned:
+        delivery.status = DeliveryStatus.ASSIGNED
+    else:
+        delivery.status = DeliveryStatus.DENIED
+        delivery.denial_reason = assignment.reason
+        delivery.denial_description = assignment.description
+
     delivery_repository.save(delivery)
 
 def _client_exist(client_id: int) -> bool:
