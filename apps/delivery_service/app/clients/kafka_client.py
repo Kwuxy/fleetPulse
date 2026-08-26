@@ -103,10 +103,3 @@ def get_producer() -> AIOKafkaProducer:
     if _producer is None:
         raise RuntimeError("Producer is not started")
     return _producer
-
-async def produce_truck_assignment_requested(delivery_id: str, cargo_weight_kg: int) -> None:
-    await get_producer().send(
-        'truck-assignment-requested',
-        key=delivery_id,
-        value={'delivery_id': delivery_id, 'cargo_weight_kg': cargo_weight_kg},
-    )

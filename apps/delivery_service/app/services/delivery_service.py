@@ -1,11 +1,11 @@
 import uuid
 from datetime import date
 
-from app.clients import kafka_client
+from app.producers import assignment_producer
 from app.exceptions import InvalidClient, SameLocationsException, InvalidCargo, InvalidRequestedDate, NotFoundException
 from app.models.delivery import Delivery, CreateDeliveryRequest, DeliveryStatus
 from app.repositories import delivery_repository
-from app.models.truck_assignment import TruckAssignmentCompleted
+from app.models.truck_assignment import TruckAssignmentCompleted, TruckAssignmentRequest
 
 
 async def create_delivery(request: CreateDeliveryRequest) -> Delivery:
@@ -30,7 +30,8 @@ async def create_delivery(request: CreateDeliveryRequest) -> Delivery:
 
     delivery_repository.save(delivery)
 
-    await kafka_client.produce_truck_assignment_requested(delivery.id, delivery.cargo_weight_kg)
+    assignment_request = TruckAssignmentRequest(delivery_id=delivery.id, cargo_weight_kg=delivery.cargo_weight_kg)
+    await assignment_producer.produce_truck_assignment_requested(assignment_request)
     return delivery
 
 def update_delivery_with_truck_assignment(assignment: TruckAssignmentCompleted) -> None:
