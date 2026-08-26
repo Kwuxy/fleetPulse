@@ -10,7 +10,7 @@ from app.clients import kafka_client
 logging.basicConfig(
     level=os.environ.get("LOG_LEVEL", "INFO"),
     # format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    format=f"{'%(levelname)s:': <18} %(message)s",
+    format=f"%(levelname)-8s %(message)s",
 )
 
 @asynccontextmanager
