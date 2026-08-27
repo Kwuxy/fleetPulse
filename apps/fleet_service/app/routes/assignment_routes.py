@@ -15,10 +15,10 @@ async def assign_truck(request: TruckAssignmentRequest) -> TruckAssignmentComple
     except InvalidCargoWeight as e:
         raise HTTPException(status_code=400, detail=str(e))
     except NoTruckAvailable as e:
-        return TruckAssignmentCompleted(
-            truck_id=None,
-            assigned=False,
-            reason=TruckAssignmentFailureReason.NO_AVAILABLE_TRUCK
+        return TruckAssignmentCompleted.get_failed(
+            delivery_id=request.delivery_id,
+            reason=TruckAssignmentFailureReason.NO_AVAILABLE_TRUCK,
+            description=str(e),
         )
 
-    return TruckAssignmentCompleted(truck_id=truck.id, assigned=True)
+    return TruckAssignmentCompleted.get_success(delivery_id=request.delivery_id, truck_id=truck.id)
