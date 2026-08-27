@@ -1,5 +1,4 @@
 from fastapi import APIRouter, HTTPException
-from httpx import TimeoutException
 
 from app.exceptions import InvalidClient, SameLocationsException, InvalidCargo, InvalidRequestedDate, NotFoundException
 from app.models.delivery import Delivery, CreateDeliveryRequest
@@ -19,8 +18,6 @@ async def create_delivery(request: CreateDeliveryRequest) -> Delivery:
         raise HTTPException(status_code=400, detail=str(e))
     except InvalidRequestedDate as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except TimeoutException as e:
-        raise HTTPException(status_code=503, detail=str(e))
 
     return delivery
 

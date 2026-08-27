@@ -5,7 +5,6 @@ import pytest
 from app.exceptions import InvalidCargo, InvalidRequestedDate, SameLocationsException, NotFoundException
 from app.models.delivery import CreateDeliveryRequest, DeliveryStatus
 from app.repositories import delivery_repository
-from app.clients import fleet_client
 from app.services import delivery_service
 
 
@@ -17,16 +16,7 @@ def clear_repository():
 @pytest.mark.service
 @pytest.mark.unit
 class TestDeliveryService:
-    def test_create_delivery_assigns_truck_when_fleet_returns_truck_id(self, monkeypatch):
-        async def fake_assign_truck_to_delivery(delivery_id: str, cargo_weight_kg: int) -> str:
-            return "truck-123"
-
-        monkeypatch.setattr(
-            fleet_client,
-            "assign_truck_to_delivery",
-            fake_assign_truck_to_delivery,
-        )
-
+    def test_create_delivery_assigns_truck_when_fleet_returns_truck_id(self):
         request = CreateDeliveryRequest(
             client_id=1,
             pickup_location="Brussels",
@@ -45,16 +35,7 @@ class TestDeliveryService:
         assert delivery.status == DeliveryStatus.ASSIGNED
         assert delivery.assigned_truck_id == "truck-123"
 
-    def test_create_delivery_denies_delivery_when_fleet_returns_no_truck(self, monkeypatch):
-        async def fake_assign_truck_to_delivery(delivery_id: str, cargo_weight_kg: int) -> None:
-            return None
-
-        monkeypatch.setattr(
-            fleet_client,
-            "assign_truck_to_delivery",
-            fake_assign_truck_to_delivery,
-        )
-
+    def test_create_delivery_denies_delivery_when_fleet_returns_no_truck(self):
         request = CreateDeliveryRequest(
             client_id=1,
             pickup_location="Brussels",
@@ -69,16 +50,7 @@ class TestDeliveryService:
         assert delivery.status == DeliveryStatus.DENIED
         assert delivery.assigned_truck_id is None
 
-    def test_create_delivery_rejects_same_pickup_and_dropoff_locations(self, monkeypatch):
-        async def fake_assign_truck_to_delivery(delivery_id: str, cargo_weight_kg: int) -> str:
-            return "truck-123"
-
-        monkeypatch.setattr(
-            fleet_client,
-            "assign_truck_to_delivery",
-            fake_assign_truck_to_delivery,
-        )
-
+    def test_create_delivery_rejects_same_pickup_and_dropoff_locations(self):
         request = CreateDeliveryRequest(
             client_id=1,
             pickup_location="Brussels",
@@ -90,16 +62,7 @@ class TestDeliveryService:
         with pytest.raises(SameLocationsException):
             asyncio.run(delivery_service.create_delivery(request))
 
-    def test_create_delivery_rejects_invalid_cargo_weight(self, monkeypatch):
-        async def fake_assign_truck_to_delivery(delivery_id: str, cargo_weight_kg: int) -> str:
-            return "truck-123"
-
-        monkeypatch.setattr(
-            fleet_client,
-            "assign_truck_to_delivery",
-            fake_assign_truck_to_delivery,
-        )
-
+    def test_create_delivery_rejects_invalid_cargo_weight(self):
         request = CreateDeliveryRequest(
             client_id=1,
             pickup_location="Brussels",
@@ -111,16 +74,7 @@ class TestDeliveryService:
         with pytest.raises(InvalidCargo):
             asyncio.run(delivery_service.create_delivery(request))
 
-    def test_create_delivery_rejects_today_as_requested_date(self, monkeypatch):
-        async def fake_assign_truck_to_delivery(delivery_id: str, cargo_weight_kg: int) -> str:
-            return "truck-123"
-
-        monkeypatch.setattr(
-            fleet_client,
-            "assign_truck_to_delivery",
-            fake_assign_truck_to_delivery,
-        )
-
+    def test_create_delivery_rejects_today_as_requested_date(self):
         request = CreateDeliveryRequest(
             client_id=1,
             pickup_location="Brussels",
@@ -132,16 +86,7 @@ class TestDeliveryService:
         with pytest.raises(InvalidRequestedDate):
             asyncio.run(delivery_service.create_delivery(request))
 
-    def test_get_deliveries_returns_created_deliveries(self, monkeypatch):
-        async def fake_assign_truck_to_delivery(delivery_id: str, cargo_weight_kg: int) -> str:
-            return "truck-123"
-
-        monkeypatch.setattr(
-            fleet_client,
-            "assign_truck_to_delivery",
-            fake_assign_truck_to_delivery,
-        )
-
+    def test_get_deliveries_returns_created_deliveries(self):
         requests = [
             CreateDeliveryRequest(
                 client_id=1,
@@ -165,16 +110,7 @@ class TestDeliveryService:
         assert len(result) == 2
         assert result == deliveries
 
-    def test_get_deliveries_by_id_returns_created_deliveries(self, monkeypatch):
-        async def fake_assign_truck_to_delivery(delivery_id: str, cargo_weight_kg: int) -> str:
-            return "truck-123"
-
-        monkeypatch.setattr(
-            fleet_client,
-            "assign_truck_to_delivery",
-            fake_assign_truck_to_delivery,
-        )
-
+    def test_get_deliveries_by_id_returns_created_deliveries(self):
         requests = [
             CreateDeliveryRequest(
                 client_id=1,
@@ -196,16 +132,7 @@ class TestDeliveryService:
         result = delivery_service.get_delivery_by_id(deliveries[0].id)
         assert result == deliveries[0]
 
-    def test_get_deliveries_by_id_with_wrong_id_raises_exception(self, monkeypatch):
-        async def fake_assign_truck_to_delivery(delivery_id: str, cargo_weight_kg: int) -> str:
-            return "truck-123"
-
-        monkeypatch.setattr(
-            fleet_client,
-            "assign_truck_to_delivery",
-            fake_assign_truck_to_delivery,
-        )
-
+    def test_get_deliveries_by_id_with_wrong_id_raises_exception(self):
         requests = [
             CreateDeliveryRequest(
                 client_id=1,
@@ -223,6 +150,6 @@ class TestDeliveryService:
             )
         ]
 
-        deliveries = [asyncio.run(delivery_service.create_delivery(request)) for request in requests]
+        _ = [asyncio.run(delivery_service.create_delivery(request)) for request in requests]
         with pytest.raises(NotFoundException):
             delivery_service.get_delivery_by_id('fake_id')

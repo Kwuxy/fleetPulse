@@ -1,11 +1,8 @@
-from urllib import response
-
 import pytest
 from datetime import date, timedelta
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.clients import fleet_client
 from app.repositories import delivery_repository
 
 client = TestClient(app)
@@ -19,16 +16,7 @@ def clear_repository():
 @pytest.mark.routes
 @pytest.mark.integration
 class TestDeliveryRoutes:
-    def test_create_delivery_endpoint_returns_created_delivery_when_truck_is_assigned(self, monkeypatch):
-        async def fake_assign_truck_to_delivery(delivery_id: str, cargo_weight_kg: int) -> str:
-            return "truck-123"
-
-        monkeypatch.setattr(
-            fleet_client,
-            "assign_truck_to_delivery",
-            fake_assign_truck_to_delivery,
-        )
-
+    def test_create_delivery_endpoint_returns_created_delivery_when_truck_is_assigned(self):
         response = client.post(
             "/deliveries",
             json={
@@ -52,16 +40,7 @@ class TestDeliveryRoutes:
         assert body["status"] == "assigned"
         assert body["assigned_truck_id"] == "truck-123"
 
-    def test_create_delivery_endpoint_returns_denied_delivery_when_no_truck_is_available(self, monkeypatch):
-        async def fake_assign_truck_to_delivery(delivery_id: str, cargo_weight_kg: int) -> None:
-            return None
-
-        monkeypatch.setattr(
-            fleet_client,
-            "assign_truck_to_delivery",
-            fake_assign_truck_to_delivery,
-        )
-
+    def test_create_delivery_endpoint_returns_denied_delivery_when_no_truck_is_available(self):
         response = client.post(
             "/deliveries",
             json={
@@ -81,16 +60,7 @@ class TestDeliveryRoutes:
         assert body["status"] == "denied"
         assert body["assigned_truck_id"] is None
 
-    def test_create_delivery_endpoint_rejects_same_pickup_and_dropoff_locations(self, monkeypatch):
-        async def fake_assign_truck_to_delivery(delivery_id: str, cargo_weight_kg: int) -> str:
-            return "truck-123"
-
-        monkeypatch.setattr(
-            fleet_client,
-            "assign_truck_to_delivery",
-            fake_assign_truck_to_delivery,
-        )
-
+    def test_create_delivery_endpoint_rejects_same_pickup_and_dropoff_locations(self):
         response = client.post(
             "/deliveries",
             json={
@@ -104,16 +74,7 @@ class TestDeliveryRoutes:
 
         assert response.status_code == 400
 
-    def test_create_delivery_endpoint_rejects_invalid_cargo_weight(self, monkeypatch):
-        async def fake_assign_truck_to_delivery(delivery_id: str, cargo_weight_kg: int) -> str:
-            return "truck-123"
-
-        monkeypatch.setattr(
-            fleet_client,
-            "assign_truck_to_delivery",
-            fake_assign_truck_to_delivery,
-        )
-
+    def test_create_delivery_endpoint_rejects_invalid_cargo_weight(self):
         response = client.post(
             "/deliveries",
             json={
@@ -127,16 +88,7 @@ class TestDeliveryRoutes:
 
         assert response.status_code == 400
 
-    def test_create_delivery_endpoint_rejects_invalid_requested_date(self, monkeypatch):
-        async def fake_assign_truck_to_delivery(delivery_id: str, cargo_weight_kg: int) -> str:
-            return "truck-123"
-
-        monkeypatch.setattr(
-            fleet_client,
-            "assign_truck_to_delivery",
-            fake_assign_truck_to_delivery,
-        )
-
+    def test_create_delivery_endpoint_rejects_invalid_requested_date(self):
         response = client.post(
             "/deliveries",
             json={
@@ -150,16 +102,7 @@ class TestDeliveryRoutes:
 
         assert response.status_code == 400
 
-    def test_get_deliveries_endpoint_returns_created_deliveries(self, monkeypatch):
-        async def fake_assign_truck_to_delivery(delivery_id: str, cargo_weight_kg: int) -> str:
-            return "truck-123"
-
-        monkeypatch.setattr(
-            fleet_client,
-            "assign_truck_to_delivery",
-            fake_assign_truck_to_delivery,
-        )
-
+    def test_get_deliveries_endpoint_returns_created_deliveries(self):
         client.post(
             "/deliveries",
             json={
@@ -189,16 +132,7 @@ class TestDeliveryRoutes:
         assert response.json()[0]["pickup_location"] == "Brussels"
         assert response.json()[1]["pickup_location"] == "Rome"
 
-    def test_get_delivery_by_id_endpoint_returns_created_deliveries(self, monkeypatch):
-        async def fake_assign_truck_to_delivery(delivery_id: str, cargo_weight_kg: int) -> str:
-            return "truck-123"
-
-        monkeypatch.setattr(
-            fleet_client,
-            "assign_truck_to_delivery",
-            fake_assign_truck_to_delivery,
-        )
-
+    def test_get_delivery_by_id_endpoint_returns_created_deliveries(self):
         response = client.post(
             "/deliveries",
             json={
@@ -227,16 +161,7 @@ class TestDeliveryRoutes:
         assert response.status_code == 200
         assert response.json()["pickup_location"] == "Brussels"
 
-    def test_get_delivery_by_id_endpoint_returns_404(self, monkeypatch):
-        async def fake_assign_truck_to_delivery(delivery_id: str, cargo_weight_kg: int) -> str:
-            return "truck-123"
-
-        monkeypatch.setattr(
-            fleet_client,
-            "assign_truck_to_delivery",
-            fake_assign_truck_to_delivery,
-        )
-
+    def test_get_delivery_by_id_endpoint_returns_404(self):
         client.post(
             "/deliveries",
             json={
