@@ -14,3 +14,11 @@ build-backend = "hatchling.build"
 
 [tool.pytest.ini_options]
 testpaths = ["test"]
+markers = [
+    "service: tests for service-layer business logic",
+    "repository: tests for repository/storage behavior",
+    "routes: tests for FastAPI route behavior",
+    "unit: fast isolated tests",
+    "integration: tests involving multiple layers or external systems",
+    "kafka: tests involving Kafka producer/consumer behavior",
+]

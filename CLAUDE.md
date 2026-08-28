@@ -21,21 +21,16 @@ uvicorn apps.fleet_service.app.main:app --reload --port 8001
 uvicorn apps.delivery_service.app.main:app --reload --port 8002
 ```
 
-**Run all tests:**
+**Run tests for a service** (each service has its own local `.venv` with `pytest` installed — the workspace-root `.venv` does not; see Test Conventions for why):
 ```bash
-pytest
+cd apps/fleet_service && .venv/Scripts/python.exe -m pytest test -q
+cd apps/delivery_service && .venv/Scripts/python.exe -m pytest test -q
 ```
 
-**Run tests for a single service:**
+**Run tests by marker** (from inside the service directory, same interpreter as above):
 ```bash
-pytest apps/fleet_service/test
-pytest apps/delivery_service/test
-```
-
-**Run tests by marker:**
-```bash
-pytest -m routes
-pytest -m "unit and not integration"
+.venv/Scripts/python.exe -m pytest test -m routes
+.venv/Scripts/python.exe -m pytest test -m "unit and not integration"
 ```
 
 **Deploy to local Kubernetes (Docker Desktop required):**
@@ -67,12 +62,12 @@ Manages trucks. Layers: `routes → service → repository → models`.
 - `POST /internal/truck-assignments` — called by Delivery Service only
 
 ### Delivery Service (port 8002)
-Manages deliveries. Same layer structure, plus a `fleet_client` that makes async HTTP calls to Fleet Service.
+Manages deliveries. Same layer structure, plus Kafka producer/consumer clients for talking to Fleet Service asynchronously (see Architecture > Kafka).
 - `POST /deliveries`, `GET /deliveries`, `GET /deliveries/{id}`
-- On delivery creation, it calls Fleet Service to assign a truck; delivery status becomes `ASSIGNED` or `DENIED`.
+- On delivery creation, it produces a truck-assignment request onto Kafka and returns immediately with status `REQUESTED`; the eventual `ASSIGNED`/`DENIED` outcome arrives via a Kafka consumer and is only visible on a later `GET /deliveries/{id}`.
 
 ### Inter-service communication
-`delivery_service/app/clients/fleet_client.py` uses `httpx` (async) to call Fleet Service's `POST /internal/truck-assignments`. The base URL comes from the `FLEET_SERVICE_URL` env var (defaults to `http://127.0.0.1:8001` for local, non-containerized runs). This is no longer the live path for truck assignment — `create_delivery` now produces to Kafka instead (see Architecture > Kafka below) — but the module and its `except TimeoutException` handling in `delivery_routes.py` haven't been deleted yet; that's next up (see Project Status).
+Truck assignment used to go through a synchronous HTTP call — `delivery_service/app/clients/fleet_client.py` (`httpx`, async) calling Fleet Service's `POST /internal/truck-assignments`, base URL from the `FLEET_SERVICE_URL` env var. That module (and the `except TimeoutException` handling in `delivery_routes.py` that went with it) has been removed now that `create_delivery` produces to Kafka instead (see Architecture > Kafka below) — the internal HTTP route itself (`POST /internal/truck-assignments`) is still there on the Fleet Service side, kept temporarily for manual testing (see "Fate of `/internal/truck-assignments`" below).
 
 ### Kafka
 A single-node broker (`confluentinc/cp-kafka`, KRaft mode — no Zookeeper) runs as the `kafka` service in `docker-compose.yml`, with a combined `broker,controller` role. It exposes three listeners: `CLIENT` (`kafka:9092`, for other containers — used by `fleet_service`, `delivery_service`, `kafka_init`, `redpanda_console`), `EXTERNAL` (published to the host as `localhost:9094`, so non-containerized local runs, e.g. plain `uvicorn`, can reach the broker too — Kafka's advertised-listener metadata means a single listener can't correctly serve both container and host clients), and `CONTROLLER` for KRaft's internal Raft consensus.
@@ -89,7 +84,7 @@ A `redpanda_console` service (Redpanda Console, image `docker.redpanda.com/redpa
 
 ### Kafka-based truck assignment
 
-Assignment has moved off the synchronous `fleet_client` HTTP call onto the two existing topics; all four flow steps below are implemented end-to-end — see Project Status for exact state. The only remaining loose end on the HTTP side is deleting the now-dead `fleet_client.py` and its stale `except TimeoutException` handling in `delivery_routes.py`.
+Assignment has moved off the synchronous `fleet_client` HTTP call onto the two existing topics; all four flow steps below are implemented end-to-end, and the dead `fleet_client.py` / `except TimeoutException` cleanup is done too — see Project Status for exact state.
 
 **API semantics:** `POST /deliveries` becomes eventually consistent. It returns immediately with status `REQUESTED`; the client polls `GET /deliveries/{id}` to observe the eventual `ASSIGNED`/`DENIED` outcome.
 
@@ -110,6 +105,8 @@ Assignment has moved off the synchronous `fleet_client` HTTP call onto the two e
 
 **Offset commit contract:** `kafka_client.py` defines `QueueMessageStatus` (`CONSUMED` / `FAILED`) as the return-type contract between the generic consume loop (`_run`) and whatever handler is passed to `start_consuming`. The consumer is created with `enable_auto_commit=False`, and `_run` only calls `consumer.commit()` when the handler returns `CONSUMED` — so a message counts as done only once it's been fully handled (including being resolved to a `DENIED` completion), not merely received. A handler exception that isn't caught internally propagates out of `_run`'s `try` (logged via `logger.exception`, nothing committed), so that message is redelivered on the next poll/restart. `handle_truck_assignment_requested` uses this by catching `UnknownDelivery`/`InvalidCargoWeight`/`NoTruckAvailable` itself and returning `CONSUMED` in all three cases — deterministic business rejections are meant to resolve, not retry forever.
 
+**Producer delivery confirmation (currently a gap):** `aiokafka`'s `AIOKafkaProducer.send()` only awaits topic-metadata resolution and placing the message into the local batch accumulator; it returns an `asyncio.Future` that resolves separately once the broker actually acknowledges the write (that's what `send_and_wait` awaits on top: `future = await send(...); return await future`). Both `assignment_producer.py` modules (Fleet Service and Delivery Service) currently do `await get_producer().send(...)` and discard that returned future — so a broker-level failure *after* the message is queued (timeout, leader unavailable, etc.) is never observed by our code; `aiokafka` just logs "exception was never retrieved." For Delivery Service specifically, this means a `create_delivery` call could return `201`/`REQUESTED` while the actual produce silently fails, leaving the delivery stuck in `REQUESTED` forever with no error anywhere. This is the concrete shape of the still-open "producer error handling isn't designed yet" item below — the fix is either `send_and_wait` (confirms delivery before returning, adds real broker round-trip latency to the request) or fire-and-forget via `asyncio.create_task` with an explicit callback that handles the future's eventual exception.
+
 **Fate of `/internal/truck-assignments`:** likely retired once the consumer-based flow is live; may be kept temporarily for manual testing during the transition.
 
 **Test strategy:**
@@ -124,7 +121,7 @@ Assignment has moved off the synchronous `fleet_client` HTTP call onto the two e
 
 ## Test Conventions
 
-pytest markers (defined in `pytest.ini`):
+pytest markers (defined identically in each service's own `pyproject.toml` under `[tool.pytest.ini_options]` — see "Running tests" below for why each service needs its own copy):
 | Marker | Meaning |
 |---|---|
 | `unit` | Fast, isolated |
@@ -132,14 +129,16 @@ pytest markers (defined in `pytest.ini`):
 | `routes` | FastAPI route behavior (uses `TestClient`) |
 | `service` | Service layer business logic |
 | `repository` | Repository/storage behavior |
+| `kafka` | Kafka producer/consumer behavior |
 
-Route tests use FastAPI `TestClient`. External clients (e.g. `fleet_client`) are monkeypatched. Repository fixtures use `autouse` to reset in-memory state between tests.
+Route tests use FastAPI `TestClient`. The Kafka producer (`assignment_producer.produce_truck_assignment_requested`/`produce_truck_assignment_completed`) is monkeypatched with an `AsyncMock` in service/route tests, same role `fleet_client` used to play before it was removed. Repository fixtures use `autouse` to reset in-memory state between tests.
+
+**Running tests:** each service has its own local `.venv` (e.g. `apps/delivery_service/.venv`) with `pytest`, `fastapi`, and `aiokafka` installed — the workspace-root `.venv` does not have `pytest` at all, and `uv run pytest` should be avoided (it can implicitly `uv sync` and modify `uv.lock`). Run tests with the service's own interpreter from inside the service directory, e.g. `cd apps/delivery_service && .venv/Scripts/python.exe -m pytest test -q`. Doing it that way picks up the service's own `pyproject.toml` `[tool.pytest.ini_options]` as the config — pytest resolves config per-directory, walking up from wherever it's invoked, and stops at the first `pytest.ini`/`pyproject.toml` it finds, so each service's config is self-contained and markers must be declared there directly rather than in one shared root file. There used to be a root `pytest.ini` with the marker declarations, but it was silently unused by this workflow (never reached, since each service's own `pyproject.toml` is found first) and has been removed; markers now live only in each service's `pyproject.toml`, kept in sync by hand since the two services intentionally keep independent venvs/configs rather than sharing one workspace-wide test environment.
 
 ## Workspace Layout
 
 ```
 pyproject.toml          # uv workspace root — members: apps/*
-pytest.ini              # testpaths for both services
 apps/
   fleet_service/
     app/
@@ -154,6 +153,10 @@ apps/
       producers/        # assignment_producer — produces TruckAssignmentCompleted onto
                          #   truck-assignment-completed
     test/
+      assignment/        # test_assignment_repository, test_assignment_routes,
+                         #   test_assignment_service, test_assignment_producer,
+                         #   test_assignment_consumer
+      truck/             # test_truck_repository, test_truck_routes, test_truck_service
     deployment/         # K8s YAML manifests + Dockerfile
   delivery_service/
     app/
@@ -164,13 +167,15 @@ apps/
                          #   the Kafka message schemas — TruckAssignmentRequest,
                          #   TruckAssignmentCompleted, TruckAssignmentFailureReason —
                          #   deliberately not shared with Fleet Service's models)
-      clients/          # fleet_client (httpx, now dead code — pending removal),
-                         #   kafka_client (aiokafka, consumer + producer)
+      clients/          # kafka_client (aiokafka, consumer + producer) — fleet_client
+                         #   (httpx) has been removed, this service is Kafka-only now
       consumers/        # assignment_consumer — handles truck-assignment-completed,
                          #   updates delivery status via delivery_service
       producers/        # assignment_producer — produces TruckAssignmentRequest onto
                          #   truck-assignment-requested
-    test/
+    test/                # test_delivery_repository, test_delivery_routes,
+                         #   test_delivery_service, test_assignment_producer,
+                         #   test_assignment_consumer
     deployment/
 api_collection/         # Bruno API collection (YAML)
 infra/
@@ -208,14 +213,15 @@ docker-compose.yml       # fleet_service, delivery_service, kafka (KRaft), kafka
   - `app/models/truck_assignment.py` — Delivery Service's own `TruckAssignmentRequest`/`TruckAssignmentCompleted`/`TruckAssignmentFailureReason`, deliberately not shared with Fleet Service's copies (same reasoning as Fleet Service owning its own `TruckAssignmentRequest` for the other topic)
   - `app/consumers/assignment_consumer.py` — `handle_truck_assignment_completed(msg: dict)` parses into that model and calls `delivery_service.update_delivery_with_truck_assignment`; both a `ValidationError` on parse and a `NotFoundException` (unknown `delivery_id`) resolve to `CONSUMED`, matching Fleet Service's offset-commit contract
 - `Delivery` model gained `denial_reason` (Delivery Service's own `DeliveryDenialReason` enum — currently mirrors `TruckAssignmentFailureReason`'s values, expected to diverge and grow as denial causes beyond truck assignment are added) and `denial_description`, both set by `update_delivery_with_truck_assignment` when a delivery is denied
+- Removed the now-dead synchronous HTTP path: `delivery_service/app/clients/fleet_client.py` deleted, and the stale `except TimeoutException` handling in `delivery_routes.py` (which was already gone) along with the now-unused `from httpx import TimeoutException` import
+- `delivery_service` test suite rewritten for the Kafka-based flow — `test_delivery_service.py` and `test_delivery_routes.py` now mock `assignment_producer.produce_truck_assignment_requested` and assert `create_delivery`/`POST /deliveries` return status `REQUESTED` immediately (previously asserted the old synchronous `ASSIGNED`/`DENIED`); `test_delivery_service.py` gained a `TestUpdateDeliveryWithTruckAssignment` class covering the assigned/denied/unknown-delivery cases that `update_delivery_with_truck_assignment` now owns. Also fixed a pre-existing bug in the 404 route test (`/delivery/fake_id` typo → `/deliveries/fake_id`, which was passing for the wrong reason)
+- Tests for both services' Kafka producer/consumer paths written: `test_assignment_producer.py` (call-shape: correct topic/key/payload) and `test_assignment_consumer.py` (message-handling: success + each failure-reason mapping + malformed-message handling) exist for both Fleet Service (`apps/fleet_service/test/assignment/`) and Delivery Service (`apps/delivery_service/test/`)
+- Pytest markers fixed: the `kafka` marker is now registered (alongside the existing five), and markers are declared directly in each service's own `pyproject.toml` `[tool.pytest.ini_options]` rather than the old root `pytest.ini`, which was silently unused by the documented run-from-inside-service-directory workflow and has been deleted — see Test Conventions for why config is per-service. Considered (and rejected for now) switching to a single shared root venv via the `uv.workspace` declaration, which would allow one pytest invocation/PyCharm config across all services with auto-discovery of future ones; deliberately keeping isolated per-service venvs/configs instead, so markers are kept in sync by hand across the two `pyproject.toml` files
 
 **In progress / Next up:**
-- Remove the now-dead synchronous HTTP path: `delivery_service/app/clients/fleet_client.py` and the stale `except TimeoutException` handling in `delivery_routes.py` — `create_delivery` no longer calls `fleet_client`, it only produces to Kafka
+- Write `kafka` + `integration` tests: true round-trip smoke tests against a disposable broker via `testcontainers[kafka]` (not the docker-compose Kafka instance) — per the test strategy already documented above, none exist yet
 - Malformed messages (pydantic `ValidationError`) on both `truck-assignment-requested` and `truck-assignment-completed` are currently logged and committed (i.e. dropped) rather than routed anywhere — whether a dead-letter topic is needed is still open (flagged by `TODO`s in both consumers)
-- Tests for the Fleet Service Kafka consumer path (message parsing, exception→reason mapping, commit-vs-not behavior) — none written yet
-- Tests for the Delivery Service Kafka consumer path (`handle_truck_assignment_completed`) and producer (`produce_truck_assignment_requested`) — none written yet
-- Delivery Service Kafka producer error handling isn't designed yet — what happens on a failed/unacknowledged send (broker unavailable, produce timeout), and whether a dead-letter approach is needed for messages that are never successfully read/processed downstream
-- Add/update tests for `POST /deliveries` against its new eventually-consistent behavior (returns `REQUESTED` immediately) — currently untested
+- Delivery Service (and Fleet Service) Kafka producer error handling isn't designed yet: both `assignment_producer.py` modules `await get_producer().send(...)` and discard the returned future, so a broker-level failure after the message is queued is currently silent — see "Producer delivery confirmation" under Architecture > Kafka for the concrete mechanism and the two candidate fixes (`send_and_wait` vs. fire-and-forget with an explicit error callback)
 - Externalize the Kafka URL in `infra/kafka/create_topics.sh` via an env var instead of the hardcoded `kafka:9092` (already flagged by a `TODO` in the script)
 - Add persistence for Fleet/Delivery Services (currently in-memory only, lost on restart) and for Kafka (currently no volume, flagged by the `TODO` in `docker-compose.yml`)
 

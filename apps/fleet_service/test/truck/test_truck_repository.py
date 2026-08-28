@@ -8,33 +8,36 @@ from app.repositories import truck_repository
 def clear_repository():
     truck_repository.clear()
 
-def test_save_truck_stores_truck():
-    truck = Truck(
-        id="truck-test",
-        plate_number="AB-123-CD",
-        capacity_kg=1200,
-        status=TruckStatus.AVAILABLE,
-    )
+@pytest.mark.repository
+@pytest.mark.unit
+class TestTruckRepository:
+    def test_save_truck_stores_truck(self):
+        truck = Truck(
+            id="truck-test",
+            plate_number="AB-123-CD",
+            capacity_kg=1200,
+            status=TruckStatus.AVAILABLE,
+        )
 
-    truck_repository.save_truck(truck)
+        truck_repository.save_truck(truck)
 
-    trucks = truck_repository.get_trucks()
+        trucks = truck_repository.get_trucks()
 
-    assert trucks == [truck]
+        assert trucks == [truck]
 
-def test_get_trucks_by_plate_number():
-    plate_number = "AB-123-CD"
-    t = truck_repository.get_truck_by_plate_number(plate_number)
-    assert t is None
+    def test_get_trucks_by_plate_number(self):
+        plate_number = "AB-123-CD"
+        t = truck_repository.get_truck_by_plate_number(plate_number)
+        assert t is None
 
-    truck = Truck(
-        id="truck-test",
-        plate_number="AB-123-CD",
-        capacity_kg=1200,
-        status=TruckStatus.AVAILABLE,
-    )
+        truck = Truck(
+            id="truck-test",
+            plate_number="AB-123-CD",
+            capacity_kg=1200,
+            status=TruckStatus.AVAILABLE,
+        )
 
-    truck_repository.save_truck(truck)
-    t = truck_repository.get_truck_by_plate_number(plate_number)
+        truck_repository.save_truck(truck)
+        t = truck_repository.get_truck_by_plate_number(plate_number)
 
-    assert t == truck
+        assert t == truck
