@@ -9,7 +9,7 @@ TOPICS = ("truck-assignment-requested", "truck-assignment-completed")
 
 @pytest.fixture(scope="module")
 def kafka_bootstrap_servers():
-    with KafkaContainer().with_kraft() as container:
+    with KafkaContainer().with_kraft().with_env("KAFKA_HEAP_OPTS", "-Xmx512m -Xms512m") as container:
         bootstrap_servers = container.get_bootstrap_server()
         asyncio.run(_create_topics(bootstrap_servers))
         yield bootstrap_servers
