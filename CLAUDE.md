@@ -32,6 +32,14 @@ cd apps/delivery_service && .venv/Scripts/python.exe -m pytest test -q
 .venv/Scripts/python.exe -m pytest test -m routes
 .venv/Scripts/python.exe -m pytest test -m "unit and not integration"
 ```
+Note `integration` isn't Kafka-specific — route tests (`test_truck_routes.py`, `test_delivery_routes.py`, `test_assignment_routes.py`) are marked `integration` too, since they cross layers via `TestClient`, even though they don't touch Docker. To exclude only the `testcontainers`-backed Kafka round-trip tests while keeping those, use `-m "not (kafka and integration)"` instead of `-m "not integration"`.
+
+**Run both services' tests sequentially, from the repo root:**
+```bash
+./run-tests.bat                                          # full suite, both services
+./run-tests.bat -m "not (kafka and integration)"          # skip the Kafka container tests
+```
+Runs Delivery Service's tests, then Fleet Service's, one after the other, stopping at the first failure; any arguments after the script name are forwarded to both `pytest` invocations. This exists because PyCharm's `CompoundRunConfigurationType` (used for a "run everything" run configuration) always launches its child configurations **simultaneously**, not sequentially, and there's no setting to change that — running both services' `kafka` + `integration` tests at the same time causes real flakiness (see Test Conventions), so the compound approach was replaced with this script for anyone wiring up a single "run all tests" PyCharm configuration (as a Batch run configuration pointed at this script instead of a compound one).
 
 **Deploy to local Kubernetes (Docker Desktop required):**
 ```bash
@@ -143,6 +151,9 @@ Route tests use FastAPI `TestClient`. The Kafka producer (`assignment_producer.p
 
 ```
 pyproject.toml          # uv workspace root — members: apps/*
+run-tests.bat            # runs both services' tests sequentially (see Common Commands) —
+                         #   exists because PyCharm compound run configs launch children in
+                         #   parallel, which causes Kafka container contention
 apps/
   fleet_service/
     app/
@@ -226,6 +237,7 @@ docker-compose.yml       # fleet_service, delivery_service, kafka (KRaft), kafka
 - First `kafka` + `integration` test written, for Fleet Service — see Test Conventions for the fixture/test design. Along the way: fixed a pre-existing gap in `fleet_service/pyproject.toml` (missing `[tool.hatch.build.targets.wheel] packages = ["app"]`, which made any `uv add`/`uv sync`-triggered rebuild of the local editable package fail with "Unable to determine which files to ship inside the wheel"), and discovered that `uv add`/`uv sync` run from inside a workspace-member service directory resolve against the **shared root environment** (root `.venv`/`uv.lock`), not that service's own local `.venv`/`uv.lock` — uv workspaces are single-environment by design, and there's no flag to opt a member out of that per-command (`--no-workspace` controls something unrelated: whether the *dependency being added* becomes a workspace member). Each service's local `.venv` + its own tracked `uv.lock` therefore isn't actually wired up to uv's workspace tooling — it must have been bootstrapped independently (matching the `pip install -e .` alternative in Common Commands) — so `testcontainers[kafka]` and `pytest-asyncio` were added to `fleet_service/pyproject.toml`'s `[dependency-groups] dev` (for documentation) and then installed directly via `.venv/Scripts/python.exe -m pip install "testcontainers[kafka]" pytest-asyncio` into the local venv, bypassing `uv add` as the install mechanism.
 - Delivery Service's mirror-image `kafka` + `integration` test written too — see Test Conventions for the fixture/test design. Hit the identical hatchling gap and the identical uv-workspace install gotcha (both fixed/worked around the same way as Fleet Service's), and the container fixture was written with `.with_kraft()` from the start this time, avoiding the Zookeeper-mode crash Fleet Service's first version hit.
 - Investigated flaky failures when running both services' `kafka` + `integration` tests at the same time — see Test Conventions for the full writeup. Root cause: resource contention between two concurrently-booting Kafka JVM brokers (not a shared-container bug — each service's fixture genuinely gets its own container), worsened on one occasion by a container stuck in a Docker Desktop kill-bug state from an earlier unrelated flake. `KAFKA_HEAP_OPTS=-Xmx512m -Xms512m` was added to both `conftest.py` fixtures to reduce each broker's memory footprint; this helps but did not fully eliminate the flakiness in testing, so running both suites' `kafka` + `integration` tests concurrently should still be expected to occasionally need a retry — running them sequentially (the normal way) remains reliable.
+- Added `run-tests.bat` (repo root) to run both services' tests sequentially from a single PyCharm run configuration or command — see Common Commands. Motivated directly by the item above: PyCharm's `CompoundRunConfigurationType` (what a "Run tests" configuration bundling both services uses) always launches its child configurations simultaneously, with no setting to make it sequential instead, so a compound config was exactly what caused the concurrent Kafka contention in the first place. The script forwards any arguments through to both `pytest` invocations, so the same script backs both a full-suite PyCharm configuration and a filtered one (e.g. `-m "not (kafka and integration)"` to skip just the Kafka container tests — see Common Commands for why that's not the same as `-m "not integration"`, since route tests are marked `integration` too without needing Docker).
 
 **In progress / Next up:**
 - Malformed messages (pydantic `ValidationError`) on both `truck-assignment-requested` and `truck-assignment-completed` are currently logged and committed (i.e. dropped) rather than routed anywhere — whether a dead-letter topic is needed is still open (flagged by `TODO`s in both consumers)
