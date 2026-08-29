@@ -1,5 +1,5 @@
 import asyncio
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -12,6 +12,7 @@ from app.producers import assignment_producer
 class TestProduceTruckAssignmentRequested:
     def test_sends_request_to_truck_assignment_requested_topic(self, monkeypatch):
         mock_producer = AsyncMock()
+        mock_producer.send.return_value = MagicMock()
         monkeypatch.setattr(assignment_producer, "get_producer", lambda: mock_producer)
 
         request = TruckAssignmentRequest(delivery_id="delivery-abc123", cargo_weight_kg=700)
