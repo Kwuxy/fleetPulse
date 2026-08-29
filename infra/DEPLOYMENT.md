@@ -23,7 +23,7 @@ docker compose down
 1. ✅ Builds an image for each service from its `Dockerfile`
 2. ✅ Starts both containers with `uvicorn --reload`
 3. ✅ Mounts each service's `app/` directory as a volume, so code edits reload automatically — no rebuild needed
-4. ✅ Starts a local Kafka broker (KRaft mode) plus a one-shot `kafka_init` service that creates the two truck-assignment topics, and points both app services at it via `KAFKA_BOOTSTRAP_SERVERS` — Fleet Service and Delivery Service now talk to each other asynchronously through Kafka rather than a direct HTTP call, so there's no `FLEET_SERVICE_URL` to set anymore
+4. ✅ Starts a local Kafka broker (KRaft mode) plus a one-shot `kafka_init` service that creates the two truck-assignment topics, and points both app services at it via `KAFKA_BOOTSTRAP_SERVERS` — Fleet Service and Delivery Service communicate with each other asynchronously through Kafka
 
 ### Useful commands
 ```bash
