@@ -16,6 +16,8 @@ services:
         condition: service_healthy
       kafka_init:
         condition: service_completed_successfully
+      postgres_init:
+        condition: service_completed_successfully
 
   delivery_service:
     build: ./apps/delivery_service
@@ -33,6 +35,8 @@ services:
       kafka:
         condition: service_healthy
       kafka_init:
+        condition: service_completed_successfully
+      postgres_init:
         condition: service_completed_successfully
 
   kafka:
@@ -84,3 +88,37 @@ services:
         condition: service_healthy
       kafka_init:
         condition: service_completed_successfully
+
+  postgres:
+    image: postgres:18.6-bookworm
+    environment:
+      POSTGRES_USER: ${POSTGRES_ADMIN_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_ADMIN_USER}" ]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  postgres_init:
+    image: postgres:18.6-bookworm
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_ADMIN_USER}
+      PGPASSWORD: ${POSTGRES_ADMIN_PASSWORD}
+      FLEET_SERVICE_DB_PASSWORD: ${FLEET_SERVICE_DB_PASSWORD}
+      DELIVERY_SERVICE_DB_PASSWORD: ${DELIVERY_SERVICE_DB_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    volumes:
+      - ./infra/postgres:/scripts
+    entrypoint: [ "sh", "/scripts/init-databases.sh" ]
+    command: [ ]
+
+volumes:
+  postgres_data:

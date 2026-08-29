@@ -88,6 +88,16 @@ Topics (1 partition, replication factor 1 — single-broker local setup):
 
 A `redpanda_console` service (Redpanda Console, image `docker.redpanda.com/redpandadata/console`) is also in `docker-compose.yml`, giving a web UI at `http://localhost:8080` for browsing topics/messages and consumer groups on the local broker. It connects to `kafka:9092` and waits on the same `kafka` (healthy) / `kafka_init` (completed) conditions as the app services.
 
+### Postgres
+
+A shared `postgres` container (`postgres:18.6-bookworm`) provides the database for both services, following the same "one shared container, logically separated" pattern already used for Kafka. It holds two databases — `fleet_service` and `delivery_service` — each with its own restricted user, so each service only ever holds credentials to its own database despite sharing the underlying container. Data persists in a named volume (`postgres_data`), which closes the volume `TODO` that used to sit on the `postgres` service. The volume is mounted at `/var/lib/postgresql`, not `/var/lib/postgresql/data` — Postgres 18+ images expect a single parent mount under which they manage a major-version-specific data subdirectory internally (this is what enables `pg_upgrade --link` without a mount-point boundary getting in the way); mounting straight onto the old `.../data` path throws a startup error on 18+ ("these Docker images are configured to store database data in a format which is compatible with pg_ctlcluster").
+
+Credentials are supplied via a git-ignored `.env` file at the repo root (`POSTGRES_ADMIN_USER`, `POSTGRES_ADMIN_PASSWORD`, `FLEET_SERVICE_DB_PASSWORD`, `DELIVERY_SERVICE_DB_PASSWORD`), substituted into `docker-compose.yml` via `${VAR}` interpolation. Compose only auto-loads a project-level env file named exactly `.env` in the project directory — a differently-named file (e.g. `local.env`) is silently ignored unless every invocation passes `--env-file`, which would break the plain `docker compose up` documented above, so the file must keep that name and live at the repo root. `POSTGRES_USER`/`POSTGRES_PASSWORD` on the `postgres` service itself are read by the official Postgres entrypoint to create the container's own admin superuser (`fleetpulse_admin`) on first boot; this superuser is bootstrap-only and is not what the app services connect with at runtime.
+
+Bootstrapping the two per-service databases/users is handled by a `postgres_init` one-shot service (`infra/postgres/init-databases.sh`), mirroring `kafka_init`'s shape rather than relying on the Postgres image's `/docker-entrypoint-initdb.d/` hook — that hook only fires once, on a container's very first boot when its data volume is still empty, so adding a new service's database later would silently be skipped against an already-initialized volume. `postgres_init` instead runs on every `docker compose up`, guarding each `CREATE DATABASE`/`CREATE USER` with an existence check against `pg_database`/`pg_roles` (Postgres has no native `IF NOT EXISTS` for either), so it's safe to re-run — a future service's database/user can just be appended as another call to the script's `create_db_and_user` function, taking effect on the next `docker compose up` with no volume reset needed. Both app services `depends_on` `postgres` (`condition: service_healthy`) and `postgres_init` (`condition: service_completed_successfully`), the same shape as their existing Kafka dependencies.
+
+**A psql `-c` quirk worth knowing:** colon-style variable interpolation (`:'var'`, used in the script to safely embed each per-service password into a `CREATE USER ... WITH PASSWORD :'pass'` statement without hand-splicing it into raw SQL text) only applies to SQL read via `-f` (a script file) or piped over stdin — not to a one-shot `-c "..."` argument, which bypasses that parsing pass and sends the text to the server verbatim, producing a syntax error at the bare `:`. `init-databases.sh` pipes that one statement through stdin (`echo "..." | psql -v pass="$db_password"`) instead of using `-c`, for that reason; the script's other statements (the `pg_database`/`pg_roles` existence checks, `CREATE DATABASE`, `GRANT`) don't interpolate a variable into SQL text and stay on `-c`.
+
 ### Kafka-based truck assignment
 
 **API semantics:** `POST /deliveries` is eventually consistent. It returns immediately with status `REQUESTED`; the client polls `GET /deliveries/{id}` to observe the eventual `ASSIGNED`/`DENIED` outcome.
@@ -191,11 +201,18 @@ api_collection/         # Bruno API collection (YAML)
 infra/
   kafka/
     create_topics.sh    # explicit, versioned topic creation — run automatically by the kafka_init service
+  postgres/
+    init-databases.sh   # idempotent per-service DB/user creation — run automatically by the
+                         #   postgres_init service on every `docker compose up` (not a
+                         #   first-boot-only /docker-entrypoint-initdb.d/ hook)
   k8s/
     deploy-local.bat    # builds images, deploys to K8s, starts port-forwarding
     shutdown-local.bat  # tears down the K8s deployment
   DEPLOYMENT.md         # local dev setup: Docker Compose vs Kubernetes
-docker-compose.yml       # fleet_service, delivery_service, kafka (KRaft), kafka_init, redpanda_console
+docker-compose.yml       # fleet_service, delivery_service, kafka (KRaft), kafka_init,
+                         #   redpanda_console, postgres, postgres_init
+.env                     # git-ignored — Postgres admin + per-service credentials (see
+                         #   Architecture > Postgres); not committed, no .env.example yet
 ```
 
 ## Project Status
@@ -210,11 +227,26 @@ docker-compose.yml       # fleet_service, delivery_service, kafka (KRaft), kafka
 - Kafka bootstrap URL externalized (`KAFKA_BOOTSTRAP_SERVERS`, mutualized via a YAML anchor in `docker-compose.yml`) instead of hardcoded per-service
 
 **In progress / Next up:**
-- Add real persistence for Fleet/Delivery Services (currently in-memory only, lost on restart) and for Kafka (currently no volume, flagged by the `TODO` in `docker-compose.yml`). Plan: a script to seed the database with a variety of test data for easier manual testing, and a migration tool (e.g. Alembic) set up from the start so future schema changes are handled properly rather than ad hoc. This is also a prerequisite for the truck position tracking feature below, since `tracking_service` will need a real repository too.
+- Add real persistence for Fleet/Delivery Services (currently in-memory only, lost on restart). Prerequisite for the truck position tracking feature below too, since `tracking_service` will need a real repository. Design decisions already made:
+  - **Database per service**, matching the existing Kafka-only inter-service boundary — but one shared `postgres` container in `docker-compose.yml` with two logical databases (`fleet_service`, `delivery_service`), each service only holding credentials to its own — not two separate Postgres containers. Mirrors how Kafka is already one shared broker locally.
+  - **Drift between the two databases is accepted, not solved, for now.** The system was already eventually consistent before persistence (Kafka-only communication, no shared transaction), so this isn't a new problem — what changes is that a lost message becomes a permanent drift instead of resetting on restart. The real fix for that specific gap is the transactional outbox pattern (write the Kafka event to an `outbox` table in the same DB transaction as the state change, relay it separately) — deliberately deferred; for now this remains the same known gap as "Producer delivery confirmation" above (visibility-only, no guaranteed delivery).
+  - Repository function signatures stay unchanged (`save_truck`, `get_truck_by_id`, etc.) — only their internals move from a dict to a real DB, so routes/services/consumers don't change at all. Each repository call opens/closes its own session (no cross-call atomic transactions within a service — a known simplification).
+
+  Planned sequence:
+  1. ✅ Done — `docker-compose.yml` `postgres` + `postgres_init` services and `infra/postgres/init-databases.sh`. Ended up as a `kafka_init`-style repeating one-shot service rather than the `/docker-entrypoint-initdb.d/` hook originally sketched here, since that hook only fires once, ever, per data volume (see the Postgres section under Architecture for the full writeup, including the mount-path and psql `-c` gotchas hit along the way).
+  2. Add `sqlalchemy[asyncio]` + `asyncpg` + `alembic` to each service (the usual uv-workspace install gotcha applies — see Test Conventions). New `app/clients/db_client.py` per service, mirroring `kafka_client.py`'s shape (engine + session factory, started/disposed via `lifespan`). `alembic init` per service — each gets its own migrations directory, matching separate databases.
+  3. SQLAlchemy ORM table models, kept separate from the existing Pydantic domain models — Pydantic stays the API/service-layer boundary, the ORM models are repository-internal only.
+  4. Rewrite `truck_repository`/`assignment_repository` (Fleet Service) and `delivery_repository` (Delivery Service) to use the DB, same signatures as today.
+  5. First Alembic migration, reflecting the current schema.
+  6. Repository tests currently test pure in-memory dict logic; once they hit Postgres they become more like integration tests. Still open: testcontainers Postgres (consistent with how the `kafka` + `integration` tests work) vs. something lighter — decide when this step is reached.
+  7. A script to seed the database with a variety of test data, for easier manual testing — once there's a real schema to seed.
+- Add a volume for Kafka too (currently none, flagged by its own `TODO` in `docker-compose.yml`) — separate from the Postgres persistence work above.
 
 **Later:**
 - Malformed messages (pydantic `ValidationError`) on both `truck-assignment-requested` and `truck-assignment-completed` are currently logged and committed (i.e. dropped) rather than routed anywhere — whether a dead-letter topic is needed is still open (flagged by `TODO`s in both consumers)
 - Monitoring and logging (e.g., Prometheus/Grafana, ELK stack)
+
+## Planned Features
 
 ### Truck position tracking
 - `gps_simulator` — a new service, a bare `asyncio` worker rather than a FastAPI app (no inbound HTTP traffic, nothing calls it — a real truck's telematics unit wouldn't expose a web API either). Loops over active trucks and produces a position update onto a new `truck-position-updates` topic on an interval (target ~10s–1min), walking along a route obtained from an external routing API.
