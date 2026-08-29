@@ -210,8 +210,22 @@ docker-compose.yml       # fleet_service, delivery_service, kafka (KRaft), kafka
 - Kafka bootstrap URL externalized (`KAFKA_BOOTSTRAP_SERVERS`, mutualized via a YAML anchor in `docker-compose.yml`) instead of hardcoded per-service
 
 **In progress / Next up:**
-- Add persistence for Fleet/Delivery Services (currently in-memory only, lost on restart) and for Kafka (currently no volume, flagged by the `TODO` in `docker-compose.yml`)
+- Add real persistence for Fleet/Delivery Services (currently in-memory only, lost on restart) and for Kafka (currently no volume, flagged by the `TODO` in `docker-compose.yml`). Plan: a script to seed the database with a variety of test data for easier manual testing, and a migration tool (e.g. Alembic) set up from the start so future schema changes are handled properly rather than ad hoc. This is also a prerequisite for the truck position tracking feature below, since `tracking_service` will need a real repository too.
 
 **Later:**
 - Malformed messages (pydantic `ValidationError`) on both `truck-assignment-requested` and `truck-assignment-completed` are currently logged and committed (i.e. dropped) rather than routed anywhere — whether a dead-letter topic is needed is still open (flagged by `TODO`s in both consumers)
 - Monitoring and logging (e.g., Prometheus/Grafana, ELK stack)
+
+### Truck position tracking
+- `gps_simulator` — a new service, a bare `asyncio` worker rather than a FastAPI app (no inbound HTTP traffic, nothing calls it — a real truck's telematics unit wouldn't expose a web API either). Loops over active trucks and produces a position update onto a new `truck-position-updates` topic on an interval (target ~10s–1min), walking along a route obtained from an external routing API.
+- Routing: a call to an external routing API to get the path from pickup to dropoff. OSRM's public demo server (`router.project-osrm.org`) is the likely choice for a learning project, since it needs no API key.
+- `tracking_service` — a new FastAPI service: consumes `truck-position-updates`, keeps an in-memory `{truck_id: latest_position}` cache (serves live reads without touching Kafka/DB per request), persists to a repository on a throttle rather than on every message (storage only needs a rough idea of where a truck is, not perfect accuracy), and exposes a WebSocket endpoint so clients get live position pushes.
+- Open design question, deliberately deferred until both services exist: should `gps_simulator` produce directly onto Kafka, or call an HTTP route on `tracking_service` which produces on its behalf?
+- `truck-position-updates` will likely be a compacted topic (`cleanup.policy=compact`, keyed by `truck_id`), since only the latest position matters — unlike the existing two topics, which use default retention.
+- Map UI: a frontend visualizing live truck positions on a map, built once the backend above exists. Mainly for a visual/demo payoff rather than FastAPI/Kafka practice, so it's the last piece, not the first.
+
+### Truck maintenance
+Truck unavailability for a scheduled repair window (`IN_REPAIR` status with a start/end time). Parked for now.
+
+### Availability-aware delivery scheduling
+Allow scheduling a delivery on a truck that is currently unavailable but will become available by the delivery time, instead of only considering trucks available right now. Parked as a later task.
