@@ -1,8 +1,7 @@
 #!/bin/sh
 set -e
 
-# TODO : Maybe use env var for kafka url
-KAFKA_URL="kafka:9092"
+KAFKA_URL="${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}"
 topics="truck-assignment-requested:1 truck-assignment-completed:1"
 
 for topic in $topics; do

@@ -1,11 +1,13 @@
+x-kafka-bootstrap: &kafka-bootstrap kafka:9092
+
 services:
   fleet_service:
     build: ./apps/fleet_service
     ports:
       - "8001:8001"
     environment:
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - LOG_LEVEL=INFO
+      KAFKA_BOOTSTRAP_SERVERS: *kafka-bootstrap
+      LOG_LEVEL: INFO
     volumes:
       - ./apps/fleet_service/app:/code/app  # Volume for hot reloading
     command: uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
@@ -20,9 +22,9 @@ services:
     ports:
       - "8002:8002"
     environment:
-      - FLEET_SERVICE_URL=http://fleet_service:8001
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - LOG_LEVEL=INFO
+      FLEET_SERVICE_URL: http://fleet_service:8001
+      KAFKA_BOOTSTRAP_SERVERS: *kafka-bootstrap
+      LOG_LEVEL: INFO
     volumes:
       - ./apps/delivery_service/app:/code/app  # Volume for hot reloading
     command: uvicorn app.main:app --host 0.0.0.0 --port 8002 --reload
@@ -61,6 +63,8 @@ services:
 
   kafka_init:
     image: confluentinc/cp-kafka:latest
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: *kafka-bootstrap
     depends_on:
       kafka:
         condition: service_healthy
@@ -75,7 +79,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      KAFKA_BROKERS: kafka:9092
+      KAFKA_BROKERS: *kafka-bootstrap
     depends_on:
       kafka:
         condition: service_healthy
