@@ -6,7 +6,7 @@ from typing import AsyncIterator
 from fastapi import FastAPI
 
 from app.routes import truck_routes
-from app.clients import kafka_client
+from app.clients import kafka_client, db_client
 from app.consumers import assignment_consumer
 
 logging.basicConfig(
@@ -19,9 +19,11 @@ logging.basicConfig(
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await kafka_client.start_consuming(assignment_consumer.handle_truck_assignment_requested)
     await kafka_client.start_producer()
+    await db_client.start_db()
     yield
     await kafka_client.stop_consuming()
     await kafka_client.stop_producer()
+    await db_client.stop_db()
 
 app = FastAPI(lifespan=lifespan, title='Fleet Service')
 
