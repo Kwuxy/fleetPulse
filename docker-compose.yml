@@ -7,6 +7,11 @@ services:
       - "8001:8001"
     environment:
       KAFKA_BOOTSTRAP_SERVERS: *kafka-bootstrap
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_DB: ${FLEET_SERVICE_DB_NAME}
+      POSTGRES_USER: ${FLEET_SERVICE_DB_USER}
+      POSTGRES_PASSWORD: ${FLEET_SERVICE_DB_PASSWORD}
       LOG_LEVEL: INFO
     volumes:
       - ./apps/fleet_service/app:/code/app  # Volume for hot reloading
@@ -25,6 +30,11 @@ services:
       - "8002:8002"
     environment:
       KAFKA_BOOTSTRAP_SERVERS: *kafka-bootstrap
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_DB: ${DELIVERY_SERVICE_DB_NAME}
+      POSTGRES_USER: ${DELIVERY_SERVICE_DB_USER}
+      POSTGRES_PASSWORD: ${DELIVERY_SERVICE_DB_PASSWORD}
       LOG_LEVEL: INFO
     volumes:
       - ./apps/delivery_service/app:/code/app  # Volume for hot reloading
@@ -91,6 +101,8 @@ services:
 
   postgres:
     image: postgres:18.6-bookworm
+    ports:
+      - "5432:5432"
     environment:
       POSTGRES_USER: ${POSTGRES_ADMIN_USER}
       POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD}
@@ -106,7 +118,7 @@ services:
   postgres_init:
     image: postgres:18.6-bookworm
     environment:
-      PGHOST: postgres
+      PGHOST: ${POSTGRES_HOST:-postgres}
       PGUSER: ${POSTGRES_ADMIN_USER}
       PGPASSWORD: ${POSTGRES_ADMIN_PASSWORD}
       FLEET_SERVICE_DB_USER: ${FLEET_SERVICE_DB_USER}
