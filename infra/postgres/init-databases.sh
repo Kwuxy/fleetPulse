@@ -17,5 +17,5 @@ create_db_and_user() {
   psql -d "${db_name}" -c "GRANT ALL PRIVILEGES ON DATABASE ${db_name} TO ${db_user}"
 }
 
-create_db_and_user fleet_service fleet_service_user "${FLEET_SERVICE_DB_PASSWORD}"
-create_db_and_user delivery_service delivery_service_user "${DELIVERY_SERVICE_DB_PASSWORD}"
+create_db_and_user "${FLEET_SERVICE_DB_NAME}" "${FLEET_SERVICE_DB_USER}" "${FLEET_SERVICE_DB_PASSWORD}"
+create_db_and_user "${DELIVERY_SERVICE_DB_NAME}" "${DELIVERY_SERVICE_DB_USER}" "${DELIVERY_SERVICE_DB_PASSWORD}"
