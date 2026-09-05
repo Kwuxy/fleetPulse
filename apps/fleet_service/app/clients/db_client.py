@@ -53,5 +53,5 @@ def get_session_factory() -> async_sessionmaker[AsyncSession]:
 
 @asynccontextmanager
 async def get_session() -> AsyncIterator[AsyncSession]:
-    async with get_session_factory()() as session:
+    async with get_session_factory().begin() as session:
         yield session
