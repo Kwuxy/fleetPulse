@@ -15,6 +15,7 @@ create_db_and_user() {
   fi
 
   psql -d "${db_name}" -c "GRANT ALL PRIVILEGES ON DATABASE ${db_name} TO ${db_user}"
+  psql -d "${db_name}" -c "GRANT ALL ON SCHEMA public TO ${db_user}"
 }
 
 create_db_and_user "${FLEET_SERVICE_DB_NAME}" "${FLEET_SERVICE_DB_USER}" "${FLEET_SERVICE_DB_PASSWORD}"
