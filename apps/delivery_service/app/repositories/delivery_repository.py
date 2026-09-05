@@ -5,7 +5,7 @@ from app.models.orm.delivery import Delivery as DeliveryORM
 from app.clients import db_client
 
 
-async def save(delivery: Delivery) -> None:
+async def save_delivery(delivery: Delivery) -> None:
     orm_delivery = _to_orm(delivery)
     async with db_client.get_session() as session:
         await session.merge(orm_delivery)

@@ -28,7 +28,7 @@ async def create_delivery(request: CreateDeliveryRequest) -> Delivery:
         assigned_truck_id=None
     )
 
-    await delivery_repository.save(delivery)
+    await delivery_repository.save_delivery(delivery)
 
     assignment_request = TruckAssignmentRequest(delivery_id=delivery.id, cargo_weight_kg=delivery.cargo_weight_kg)
     await assignment_producer.produce_truck_assignment_requested(assignment_request)
@@ -44,7 +44,7 @@ async def update_delivery_with_truck_assignment(assignment: TruckAssignmentCompl
         delivery.denial_reason = assignment.reason
         delivery.denial_description = assignment.description
 
-    await delivery_repository.save(delivery)
+    await delivery_repository.save_delivery(delivery)
 
 def _client_exist(client_id: int) -> bool:
     return True
