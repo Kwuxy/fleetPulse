@@ -8,6 +8,6 @@ class Truck(Base):
     __tablename__ = "trucks"
 
     id: Mapped[str] = mapped_column(primary_key=True)
-    plate_number: Mapped[str]
+    plate_number: Mapped[str] = mapped_column(unique=True)
     capacity_kg: Mapped[int]
     status: Mapped[TruckStatus] = mapped_column(default=TruckStatus.AVAILABLE)
