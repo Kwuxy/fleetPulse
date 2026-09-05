@@ -4,8 +4,6 @@ from app.models.delivery import Delivery
 from app.models.orm.delivery import Delivery as DeliveryORM
 from app.clients import db_client
 
-_deliveries: dict[str, Delivery] = {}
-
 
 async def save(delivery: Delivery) -> None:
     orm_delivery = _to_orm(delivery)
