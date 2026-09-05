@@ -20,7 +20,7 @@ async def handle_truck_assignment_requested(msg: dict) -> QueueMessageStatus:
         return QueueMessageStatus.CONSUMED
 
     try:
-        truck = assignment_service.assign_truck_to_delivery(request)
+        truck = await assignment_service.assign_truck_to_delivery(request)
         logger.info(f'Assigned truck: {truck.id}')
     except (UnknownDelivery, InvalidCargoWeight) as e:
         logger.warning(f'Truck not assigned, {e}')

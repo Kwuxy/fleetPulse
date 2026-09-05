@@ -9,7 +9,7 @@ router = APIRouter(prefix='/trucks', tags=['trucks'])
 @router.post('', status_code=201)
 async def create_truck(request: CreateTruckRequest):
     try:
-        truck = truck_service.create_truck(request)
+        truck = await truck_service.create_truck(request)
     except InvalidPlateNumber as e:
         raise HTTPException(status_code=400, detail=str(e))
     except InvalidTruckCapacity as e:
@@ -21,4 +21,4 @@ async def create_truck(request: CreateTruckRequest):
 
 @router.get('')
 async def get_trucks() -> list[Truck]:
-    return truck_service.get_trucks()
+    return await truck_service.get_trucks()
