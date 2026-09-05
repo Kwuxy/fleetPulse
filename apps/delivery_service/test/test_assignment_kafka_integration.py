@@ -12,8 +12,8 @@ from app.repositories import delivery_repository
 
 
 @pytest.fixture(autouse=True)
-def clear_delivery_repository():
-    delivery_repository.clear()
+async def clear_delivery_repository():
+    await delivery_repository.clear()
 
 
 @pytest.mark.kafka

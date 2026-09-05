@@ -19,7 +19,7 @@ async def handle_truck_assignment_completed(msg: dict) -> QueueMessageStatus:
         return QueueMessageStatus.CONSUMED
 
     try:
-        delivery_service.update_delivery_with_truck_assignment(assignment)
+        await delivery_service.update_delivery_with_truck_assignment(assignment)
     except NotFoundException as e:
         logger.warning(f'Error while consuming truck assignment completed: {e}')
         return QueueMessageStatus.CONSUMED

@@ -28,14 +28,14 @@ async def create_delivery(request: CreateDeliveryRequest) -> Delivery:
         assigned_truck_id=None
     )
 
-    delivery_repository.save(delivery)
+    await delivery_repository.save(delivery)
 
     assignment_request = TruckAssignmentRequest(delivery_id=delivery.id, cargo_weight_kg=delivery.cargo_weight_kg)
     await assignment_producer.produce_truck_assignment_requested(assignment_request)
     return delivery
 
-def update_delivery_with_truck_assignment(assignment: TruckAssignmentCompleted) -> None:
-    delivery = get_delivery_by_id(assignment.delivery_id)
+async def update_delivery_with_truck_assignment(assignment: TruckAssignmentCompleted) -> None:
+    delivery = await get_delivery_by_id(assignment.delivery_id)
     delivery.assigned_truck_id = assignment.truck_id
     if assignment.assigned:
         delivery.status = DeliveryStatus.ASSIGNED
@@ -44,7 +44,7 @@ def update_delivery_with_truck_assignment(assignment: TruckAssignmentCompleted) 
         delivery.denial_reason = assignment.reason
         delivery.denial_description = assignment.description
 
-    delivery_repository.save(delivery)
+    await delivery_repository.save(delivery)
 
 def _client_exist(client_id: int) -> bool:
     return True
@@ -61,11 +61,11 @@ def _date_is_valid(requested_date: date) -> bool:
 def _generate_delivery_id():
     return f"delivery-{uuid.uuid4().hex[:8]}"
 
-def get_deliveries() -> list[Delivery]:
-    return delivery_repository.get_deliveries()
+async def get_deliveries() -> list[Delivery]:
+    return await delivery_repository.get_deliveries()
 
-def get_delivery_by_id(delivery_id: str) -> Delivery:
-    delivery = delivery_repository.get_delivery_by_id(delivery_id)
+async def get_delivery_by_id(delivery_id: str) -> Delivery:
+    delivery = await delivery_repository.get_delivery_by_id(delivery_id)
     if not delivery:
         raise NotFoundException(delivery_id)
 
