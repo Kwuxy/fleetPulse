@@ -1,26 +1,17 @@
 import os
 import asyncio
 from logging.config import fileConfig
+from pathlib import Path
 
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection, URL
-from sqlalchemy.ext.asyncio import async_engine_from_config
+from sqlalchemy.ext.asyncio import create_async_engine
 
 from alembic import context
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
-
-sqlalchemy_url = URL.create(
-    drivername='postgresql+asyncpg',
-    username=os.environ.get('POSTGRES_USER', 'POPULATE .env file'),
-    password=os.environ.get('POSTGRES_PASSWORD', 'POPULATE .env file'),
-    host=os.environ.get('POSTGRES_HOST', 'localhost'),
-    port=int(os.environ.get('POSTGRES_PORT', '5432')),
-    database=os.environ.get('POSTGRES_DB', 'POPULATE .env file'),
-)
-config.set_main_option('sqlalchemy.url', str(sqlalchemy_url))
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -39,6 +30,24 @@ target_metadata = None
 # ... etc.
 
 
+def _build_database_url() -> URL:
+    # Override the default .env file
+    from dotenv import dotenv_values
+    env_values = dotenv_values(Path(__file__).parents[3] / ".env")  # repo root
+    os.environ.setdefault("POSTGRES_USER", env_values.get("DELIVERY_SERVICE_DB_USER") or "POPULATE .env file")
+    os.environ.setdefault("POSTGRES_PASSWORD", env_values.get("DELIVERY_SERVICE_DB_PASSWORD") or "POPULATE .env file")
+    os.environ.setdefault("POSTGRES_DB", env_values.get("DELIVERY_SERVICE_DB_NAME") or "POPULATE .env file")
+
+    return URL.create(
+        drivername='postgresql+asyncpg',
+        username=os.environ.get('POSTGRES_USER'),
+        password=os.environ.get('POSTGRES_PASSWORD'),
+        host=os.environ.get('POSTGRES_HOST', 'localhost'),
+        port=int(os.environ.get('POSTGRES_PORT', '5432')),
+        database=os.environ.get('POSTGRES_DB'),
+    )
+
+
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
 
@@ -51,16 +60,17 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = config.get_main_option("sqlalchemy.url")
-    context.configure(
-        url=url,
-        target_metadata=target_metadata,
-        literal_binds=True,
-        dialect_opts={"paramstyle": "named"},
-    )
-
-    with context.begin_transaction():
-        context.run_migrations()
+    # url = config.get_main_option("sqlalchemy.url")
+    # context.configure(
+    #     url=url,
+    #     target_metadata=target_metadata,
+    #     literal_binds=True,
+    #     dialect_opts={"paramstyle": "named"},
+    # )
+    #
+    # with context.begin_transaction():
+    #     context.run_migrations()
+    raise NotImplementedError("Offline mode is not supported.")
 
 
 def do_run_migrations(connection: Connection) -> None:
@@ -76,11 +86,7 @@ async def run_async_migrations() -> None:
 
     """
 
-    connectable = async_engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
+    connectable = create_async_engine(_build_database_url(), poolclass=pool.NullPool)
 
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)
