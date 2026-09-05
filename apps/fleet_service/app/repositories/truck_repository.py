@@ -25,7 +25,9 @@ async def clear() -> None:
 
 async def get_truck_by_plate_number(plate_number: str) -> Truck | None:
     async with db_client.get_session() as session:
-        return await session.get(TruckORM, plate_number)
+        result = await session.execute(select(TruckORM).where(TruckORM.plate_number == plate_number))
+        orm_truck = result.scalar_one_or_none()
+        return _from_orm(orm_truck) if orm_truck else None
 
 
 def _to_orm(truck: Truck) -> TruckORM:
