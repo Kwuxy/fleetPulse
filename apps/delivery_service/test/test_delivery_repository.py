@@ -1,78 +1,68 @@
 from datetime import date, timedelta
+
 import pytest
+import pytest_asyncio
 
 from app.models.delivery import Delivery, DeliveryStatus
 from app.repositories import delivery_repository
 
 
-@pytest.fixture(autouse=True)
-def setup_and_teardown():
-    delivery_repository.clear()
+def _get_delivery(**overrides):
+    defaults = dict(
+        id='delivery-123',
+        client_id=23,
+        pickup_location="Test Location",
+        dropoff_location="Test Destination",
+        cargo_weight_kg=200,
+        requested_date=(date.today() + timedelta(days=1)),
+        status=DeliveryStatus.REQUESTED,
+        assigned_truck_id=None
+    )
+
+    defaults.update(overrides)
+    return Delivery(**defaults)
+
+
+@pytest_asyncio.fixture(autouse=True, loop_scope="module")
+async def clear_repository(postgres_db):
+    await delivery_repository.clear()
 
 
 @pytest.mark.repository
-@pytest.mark.unit
+@pytest.mark.integration
+@pytest.mark.asyncio(loop_scope="module")
 class TestDeliveryRepository:
-    def test_save_delivery_returns_correct_delivery(self):
+    async def test_save_delivery_returns_correct_delivery(self):
+        # - Arrange -
         deliveries = [
-            Delivery(
-                id='delivery-123',
-                client_id=23,
-                pickup_location="Test Location",
-                dropoff_location="Test Destination",
-                cargo_weight_kg=200,
-                requested_date=(date.today() + timedelta(days=1)),
-                status=DeliveryStatus.ASSIGNED,
-                assigned_truck_id="truck-1234"
-            ),
-            Delivery(
-                id='delivery-456',
-                client_id=23,
-                pickup_location="Test Location",
-                dropoff_location="Test Destination",
-                cargo_weight_kg=600,
-                requested_date=(date.today() + timedelta(days=1)),
-                status=DeliveryStatus.REQUESTED,
-                assigned_truck_id="truck-7894"
-            ),
+            _get_delivery(),
+            _get_delivery(id='delivery-456', status=DeliveryStatus.ASSIGNED, assigned_truck_id="truck-7894"),
         ]
 
         for delivery in deliveries:
-            delivery_repository.save(delivery)
+            await delivery_repository.save_delivery(delivery)
 
-        result = delivery_repository.get_deliveries()
+        # - Act -
+        result = await delivery_repository.get_deliveries()
 
+        # - Assert -
         assert len(result) == len(deliveries)
         assert result == deliveries
 
-    def test_get_delivery_by_id_returns_correct_delivery(self):
+    async def test_get_delivery_by_id_returns_correct_delivery(self):
+        # - Arrange -
         deliveries = [
-            Delivery(
-                id='delivery-123',
-                client_id=23,
-                pickup_location="Test Location",
-                dropoff_location="Test Destination",
-                cargo_weight_kg=200,
-                requested_date=(date.today() + timedelta(days=1)),
-                status=DeliveryStatus.ASSIGNED,
-                assigned_truck_id="truck-1234"
-            ),
-            Delivery(
-                id='delivery-456',
-                client_id=23,
-                pickup_location="Test Location",
-                dropoff_location="Test Destination",
-                cargo_weight_kg=600,
-                requested_date=(date.today() + timedelta(days=1)),
-                status=DeliveryStatus.REQUESTED,
-                assigned_truck_id="truck-7894"
-            ),
+            _get_delivery(),
+            _get_delivery(id='delivery-456', status=DeliveryStatus.ASSIGNED, assigned_truck_id="truck-7894"),
         ]
 
         for delivery in deliveries:
-            delivery_repository.save(delivery)
+            await delivery_repository.save_delivery(delivery)
 
-        result = delivery_repository.get_delivery_by_id("delivery-111")
-        assert result is None
-        result = delivery_repository.get_delivery_by_id("delivery-456")
-        assert result == deliveries[1]
+        # - Act -
+        missing = await delivery_repository.get_delivery_by_id("delivery-111")
+        found = await delivery_repository.get_delivery_by_id("delivery-456")
+
+        # - Assert -
+        assert missing is None
+        assert found == deliveries[1]
