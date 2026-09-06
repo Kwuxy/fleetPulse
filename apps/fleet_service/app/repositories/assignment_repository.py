@@ -3,6 +3,7 @@ from app.models.truck import Truck, TruckStatus
 
 
 async def find_available_truck_for_capacity(min_capacity_kg: int) -> Truck | None:
+    # TODO : Update this to use a more efficient query
     trucks = [
         truck
         for truck in await truck_repository.get_trucks()
