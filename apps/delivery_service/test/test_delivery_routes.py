@@ -5,93 +5,167 @@ from unittest.mock import AsyncMock
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.producers import assignment_producer
-from app.repositories import delivery_repository
+from app.models.delivery import Delivery, DeliveryStatus, CreateDeliveryRequest
+from app.services import delivery_service
+from app.exceptions import InvalidClient, SameLocationsException, InvalidCargo, InvalidRequestedDate, NotFoundException
 
 client = TestClient(app)
 
 
-@pytest.fixture(autouse=True)
-def clear_repository():
-    delivery_repository.clear()
-
-
-@pytest.fixture(autouse=True)
-def mock_produce_truck_assignment_requested(monkeypatch):
-    monkeypatch.setattr(assignment_producer, "produce_truck_assignment_requested", AsyncMock())
-
-
-def _valid_payload(**overrides):
-    defaults = {
-        "client_id": 1,
-        "pickup_location": "Brussels",
-        "dropoff_location": "Paris",
-        "cargo_weight_kg": 700,
-        "requested_date": str(date.today() + timedelta(days=1)),
+def _get_delivery(**overrides):
+    default = {
+        'id': 'delivery-1234',
+        'client_id': 1,
+        'pickup_location': "Brussels",
+        'dropoff_location': "Paris",
+        'cargo_weight_kg': 700,
+        'requested_date': date.today() + timedelta(days=1),
+        'status': DeliveryStatus.REQUESTED,
+        'assigned_truck_id': None
     }
-    defaults.update(overrides)
-    return defaults
+    default.update(overrides)
+    return Delivery(**default)
 
 
 @pytest.mark.routes
-@pytest.mark.integration
+@pytest.mark.unit
 class TestDeliveryRoutes:
-    def test_create_delivery_endpoint_returns_requested_delivery(self):
-        response = client.post("/deliveries", json=_valid_payload())
+    class TestCreateDeliveryEndpoint:
+        @staticmethod
+        def _get_valid_payload(**overrides):
+            defaults = {
+                "client_id": 1,
+                "pickup_location": "Brussels",
+                "dropoff_location": "Paris",
+                "cargo_weight_kg": 700,
+                "requested_date": str(date.today() + timedelta(days=1)),
+            }
+            defaults.update(overrides)
+            return defaults
 
-        assert response.status_code == 201
+        def test_create_delivery_endpoint_returns_created_delivery(self, monkeypatch):
+            # - Arrange -
+            delivery = _get_delivery()
+            mock_create_delivery = AsyncMock(return_value=delivery)
+            monkeypatch.setattr(delivery_service, "create_delivery", mock_create_delivery)
 
-        body = response.json()
+            payload = self._get_valid_payload()
+            request = CreateDeliveryRequest(**payload)
 
-        assert body["id"].startswith("delivery-")
-        assert body["client_id"] == 1
-        assert body["pickup_location"] == "Brussels"
-        assert body["dropoff_location"] == "Paris"
-        assert body["cargo_weight_kg"] == 700
-        assert body["status"] == "requested"
-        assert body["assigned_truck_id"] is None
+            # - Act -
+            response = client.post("/deliveries", json=payload)
 
-    def test_create_delivery_endpoint_rejects_same_pickup_and_dropoff_locations(self):
-        response = client.post("/deliveries", json=_valid_payload(dropoff_location="Brussels"))
-        assert response.status_code == 400
+            # - Assert result -
+            assert response.status_code == 201
+            assert response.json() == delivery.model_dump(mode="json")
 
-    def test_create_delivery_endpoint_rejects_invalid_cargo_weight(self):
-        response = client.post("/deliveries", json=_valid_payload(cargo_weight_kg=0))
-        assert response.status_code == 400
+            # - Assert mock -
+            mock_create_delivery.assert_awaited_once_with(request)
 
-    def test_create_delivery_endpoint_rejects_invalid_requested_date(self):
-        response = client.post("/deliveries", json=_valid_payload(requested_date=str(date.today())))
-        assert response.status_code == 400
+        @staticmethod
+        def raise_invalid_client(req: CreateDeliveryRequest):
+            raise InvalidClient(req.client_id)
 
-    def test_get_deliveries_endpoint_returns_created_deliveries(self):
-        client.post("/deliveries", json=_valid_payload())
-        client.post(
-            "/deliveries",
-            json=_valid_payload(client_id=2, pickup_location="Rome", dropoff_location="Berlin", cargo_weight_kg=900),
-        )
+        @staticmethod
+        def raise_same_locations(req: CreateDeliveryRequest):
+            raise SameLocationsException()
 
-        response = client.get("/deliveries")
+        @staticmethod
+        def raise_invalid_cargo(req: CreateDeliveryRequest):
+            raise InvalidCargo(req.cargo_weight_kg)
 
-        assert response.status_code == 200
-        assert len(response.json()) == 2
-        assert response.json()[0]["pickup_location"] == "Brussels"
-        assert response.json()[1]["pickup_location"] == "Rome"
+        @staticmethod
+        def raise_invalid_requested_date(req: CreateDeliveryRequest):
+            raise InvalidRequestedDate(req.requested_date)
 
-    def test_get_delivery_by_id_endpoint_returns_created_deliveries(self):
-        response = client.post("/deliveries", json=_valid_payload())
-        client.post(
-            "/deliveries",
-            json=_valid_payload(client_id=2, pickup_location="Rome", dropoff_location="Berlin", cargo_weight_kg=900),
-        )
+        @pytest.mark.parametrize('side_effect_exception, payload', [
+            (raise_invalid_client, _get_valid_payload()),
+            (raise_same_locations, _get_valid_payload(pickup_location='Paris', dropoff_location='Paris')),
+            (raise_invalid_cargo, _get_valid_payload(cargo_weight_kg=0)),
+            (raise_invalid_requested_date, _get_valid_payload(requested_date=str(date.today() - timedelta(days=1)))),
+        ])
+        def test_create_deliveries_endpoint_rejects_exceptions(self, monkeypatch, side_effect_exception, payload):
+            # - Arrange -
+            mock_create_delivery = AsyncMock(side_effect=side_effect_exception)
+            monkeypatch.setattr(delivery_service, "create_delivery", mock_create_delivery)
 
-        delivery_id = response.json()["id"]
-        response = client.get(f"/deliveries/{delivery_id}")
+            request = CreateDeliveryRequest(**payload)
 
-        assert response.status_code == 200
-        assert response.json()["pickup_location"] == "Brussels"
+            # - Act -
+            response = client.post("/deliveries", json=payload)
 
-    def test_get_delivery_by_id_endpoint_returns_404(self):
-        client.post("/deliveries", json=_valid_payload())
+            # - Assert result -
+            assert response.status_code == 400
 
-        response = client.get("/deliveries/fake_id")
-        assert response.status_code == 404
+            # - Assert mock -
+            mock_create_delivery.assert_awaited_once_with(request)
+
+    class TestListDeliveriesEndpoint:
+        def test_list_deliveries_endpoint_returns_empty_list_when_no_deliveries_exist(self, monkeypatch):
+            # - Arrange -
+            mock_get_deliveries = AsyncMock(return_value=[])
+            monkeypatch.setattr(delivery_service, "get_deliveries", mock_get_deliveries)
+
+            # - Act -
+            response = client.get("/deliveries")
+
+            # - Assert result -
+            assert response.status_code == 200
+            assert response.json() == []
+
+            # - Assert mock -
+            mock_get_deliveries.assert_awaited_once()
+
+        def test_list_deliveries_endpoint_returns_deliveries_from_service(self, monkeypatch):
+            # - Arrange -
+            deliveries = [
+                _get_delivery(),
+                _get_delivery(status=DeliveryStatus.ASSIGNED, assigned_truck_id='truck-4585')
+            ]
+            mock_get_deliveries = AsyncMock(return_value=deliveries)
+            monkeypatch.setattr(delivery_service, "get_deliveries", mock_get_deliveries)
+
+            # - Act -
+            response = client.get("/deliveries")
+
+            # - Assert result -
+            assert response.status_code == 200
+            assert response.json() == [delivery.model_dump(mode="json") for delivery in deliveries]
+
+            # - Assert mock -
+            mock_get_deliveries.assert_awaited_once()
+
+    class TestGetDeliveryByIdEndpoint:
+        def test_get_delivery_by_id_endpoint_returns_delivery(self, monkeypatch):
+            # - Arrange -
+            delivery = _get_delivery()
+            mock_get_delivery_by_id = AsyncMock(return_value=delivery)
+            monkeypatch.setattr(delivery_service, "get_delivery_by_id", mock_get_delivery_by_id)
+
+            # - Act -
+            response = client.get(f"/deliveries/{delivery.id}")
+
+            # - Assert result -
+            assert response.status_code == 200
+            assert response.json() == delivery.model_dump(mode="json")
+
+            # - Assert mock -
+            mock_get_delivery_by_id.assert_awaited_once_with(delivery.id)
+
+        def test_get_delivery_by_id_endpoint_returns_404_when_not_found(self, monkeypatch):
+            # - Arrange -
+            def raise_not_found(_delivery_id):
+                raise NotFoundException(_delivery_id)
+
+            mock_get_delivery_by_id = AsyncMock(side_effect=raise_not_found)
+            monkeypatch.setattr(delivery_service, "get_delivery_by_id", mock_get_delivery_by_id)
+            delivery_id = 'delivery-666'
+
+            # - Act -
+            response = client.get(f"/deliveries/{delivery_id}")
+
+            # - Assert result -
+            assert response.status_code == 404
+
+            # - Assert mock -
+            mock_get_delivery_by_id.assert_awaited_once_with(delivery_id)
