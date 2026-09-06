@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 async def handle_truck_assignment_completed(msg: dict) -> QueueMessageStatus:
     try:
-        assignment = TruckAssignmentCompleted(**msg)
+        assignment = _build_truck_assignment_completed(msg)
     except ValidationError as e:
         # TODO : ValidationError should go to a dead-letter topic
         logger.warning(f'Invalid request: {e}')
@@ -25,3 +25,6 @@ async def handle_truck_assignment_completed(msg: dict) -> QueueMessageStatus:
         return QueueMessageStatus.CONSUMED
 
     return QueueMessageStatus.CONSUMED
+
+def _build_truck_assignment_completed(msg: dict) -> TruckAssignmentCompleted:
+    return TruckAssignmentCompleted(**msg)
