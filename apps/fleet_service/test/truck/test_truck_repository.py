@@ -1,43 +1,51 @@
 import pytest
+import pytest_asyncio
 
 from app.models.truck import Truck, TruckStatus
 from app.repositories import truck_repository
 
 
-@pytest.fixture(autouse=True)
-def clear_repository():
-    truck_repository.clear()
+@pytest_asyncio.fixture(autouse=True, loop_scope="module")
+async def clear_repository(postgres_db):
+    await truck_repository.clear()
+
 
 @pytest.mark.repository
-@pytest.mark.unit
+@pytest.mark.integration
+@pytest.mark.asyncio(loop_scope="module")
 class TestTruckRepository:
-    def test_save_truck_stores_truck(self):
-        truck = Truck(
-            id="truck-test",
-            plate_number="AB-123-CD",
-            capacity_kg=1200,
-            status=TruckStatus.AVAILABLE,
-        )
+    async def test_save_truck_stores_truck(self):
+        # - Arrange -
+        truck = self._get_truck()
+        await truck_repository.save_truck(truck)
 
-        truck_repository.save_truck(truck)
+        # - Act -
+        trucks = await truck_repository.get_trucks()
 
-        trucks = truck_repository.get_trucks()
-
+        # - Assert -
         assert trucks == [truck]
 
-    def test_get_trucks_by_plate_number(self):
-        plate_number = "AB-123-CD"
-        t = truck_repository.get_truck_by_plate_number(plate_number)
+    async def test_get_trucks_by_plate_number(self):
+        # - Arrange -
+        truck = self._get_truck()
+        t = await truck_repository.get_truck_by_plate_number(truck.plate_number)
         assert t is None
 
-        truck = Truck(
-            id="truck-test",
+        await truck_repository.save_truck(truck)
+
+        # - Act -
+        t = await truck_repository.get_truck_by_plate_number(truck.plate_number)
+
+        # - Assert -
+        assert t == truck
+
+    @staticmethod
+    def _get_truck(**overrides):
+        defaults = dict(
+            id="truck-123",
             plate_number="AB-123-CD",
             capacity_kg=1200,
-            status=TruckStatus.AVAILABLE,
+            status=TruckStatus.AVAILABLE
         )
-
-        truck_repository.save_truck(truck)
-        t = truck_repository.get_truck_by_plate_number(plate_number)
-
-        assert t == truck
+        defaults.update(overrides)
+        return Truck(**defaults)
