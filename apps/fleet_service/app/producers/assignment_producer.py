@@ -2,7 +2,7 @@ import asyncio
 import functools
 import logging
 
-from app.clients.kafka_client import get_producer
+from app.clients import kafka_client
 from app.models.assignment import TruckAssignmentCompleted
 
 logger = logging.getLogger(__name__)
@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 async def produce_truck_assignment_completed(truck_assignment_completed: TruckAssignmentCompleted) -> None:
     topic = 'truck-assignment-completed'
-    future = await get_producer().send(
+    future = await kafka_client.get_producer().send(
         topic,
         key=truck_assignment_completed.delivery_id,
         value=truck_assignment_completed.model_dump(),
