@@ -41,6 +41,7 @@ async def start_consuming(handler: Callable) -> None:
         value_deserializer=lambda value: json.loads(value) if value else None,
         group_id='fleet-service-group',
         enable_auto_commit=False,
+        auto_offset_reset="earliest",
     )
     await _consumer.start()
 
