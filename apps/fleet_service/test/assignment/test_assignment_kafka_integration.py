@@ -117,10 +117,7 @@ class TestAssignmentKafkaIntegration:
         )
 
         await asyncio.wait_for(_wait_for_await_count(mock_assign_truck_to_delivery, 1), timeout=15)
-
-        # Manually "restart" the consuming loop to simulate a restart of the consumer
-        await kafka_client.stop_consuming()
-        await kafka_client.start_consuming(handle_truck_assignment_requested)
+        await restart_kafka_client()
 
         # - Assert result -
         consumed_msg = await asyncio.wait_for(kafka_consumer.getone(), timeout=15)
@@ -152,10 +149,7 @@ class TestAssignmentKafkaIntegration:
         await asyncio.wait_for(kafka_consumer.getone(), timeout=15)
         await asyncio.sleep(0.5)  # Waiting for the message to be committed, avoid race condition
 
-        # Manually "restart" the consuming loop to simulate a restart of the consumer
-        await kafka_client.stop_consuming()
-        await kafka_client.start_consuming(handle_truck_assignment_requested)
-
+        await restart_kafka_client()
         await asyncio.sleep(1)  # Giving time to kafka to redeliver the message
 
         # - Assert result -
@@ -192,3 +186,9 @@ class TestAssignmentKafkaIntegration:
 async def _wait_for_await_count(mock, count):
     while mock.await_count < count:
         await asyncio.sleep(0.1)
+
+
+async def restart_kafka_client():
+    # Manually "restart" the consuming loop to simulate a restart of the consumer
+    await kafka_client.stop_consuming()
+    await kafka_client.start_consuming(handle_truck_assignment_requested)
