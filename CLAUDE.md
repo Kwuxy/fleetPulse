@@ -111,6 +111,8 @@ Each service's `migrations/env.py` builds its own SQLAlchemy `URL` from the same
 - **A literal `$` in a `.env` password breaks Docker Compose, not Python:** Compose's `${VAR}` interpolation treats `$X` in a `.env` value as a reference to another variable and blanks it if `X` is undefined, while `dotenv_values()` reads the same file literally — the two disagree on what the password actually is. Avoid `$` in generated passwords, or escape as `$$`.
 - **Revision IDs stay Alembic's default random hash**, not hand-rolled sequential numbers — each service's `migrations/versions/` and `alembic_version` table are already fully independent (separate databases), so there's no cross-service ordering a sequential scheme would help with.
 
+Creating a migration: `.venv/Scripts/python.exe -m alembic revision --autogenerate -m "<message>"` from inside the service directory, same interpreter convention as tests.
+
 Applying a migration: `.venv/Scripts/python.exe -m alembic upgrade head` from inside the service directory, same interpreter convention as tests.
 
 ### Kafka-based truck assignment
