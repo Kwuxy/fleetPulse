@@ -33,12 +33,13 @@ target_metadata = Base.metadata
 
 
 def _build_database_url() -> URL:
-    # Override the default .env file
-    from dotenv import dotenv_values
-    env_values = dotenv_values(Path(__file__).parents[3] / ".env")  # repo root
-    os.environ.setdefault("POSTGRES_USER", env_values.get("DELIVERY_SERVICE_DB_USER") or "POPULATE .env file")
-    os.environ.setdefault("POSTGRES_PASSWORD", env_values.get("DELIVERY_SERVICE_DB_PASSWORD") or "POPULATE .env file")
-    os.environ.setdefault("POSTGRES_DB", env_values.get("DELIVERY_SERVICE_DB_NAME") or "POPULATE .env file")
+    if os.environ.get('POSTGRES_USER') is None:
+        # Override the default .env file
+        from dotenv import dotenv_values
+        env_values = dotenv_values(Path(__file__).parents[3] / ".env")  # repo root
+        os.environ.setdefault("POSTGRES_USER", env_values.get("DELIVERY_SERVICE_DB_USER") or "POPULATE .env file")
+        os.environ.setdefault("POSTGRES_PASSWORD", env_values.get("DELIVERY_SERVICE_DB_PASSWORD") or "POPULATE .env file")
+        os.environ.setdefault("POSTGRES_DB", env_values.get("DELIVERY_SERVICE_DB_NAME") or "POPULATE .env file")
 
     return URL.create(
         drivername='postgresql+asyncpg',
