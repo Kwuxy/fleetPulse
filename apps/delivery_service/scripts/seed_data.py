@@ -46,7 +46,7 @@ def _get_delivery_cargo_weight_kg(size: str) -> int:
             raise ValueError(f"Invalid size: {size}")
 
 
-def _override_env_variables() -> URL:
+def _override_env_variables() -> None:
     # Override the default .env file
     from dotenv import dotenv_values
     env_values = dotenv_values(Path(__file__).parents[3] / ".env")  # repo root
@@ -93,6 +93,9 @@ def _get_deliveries(nb: int, **overrides) -> list[Delivery]:
         match default['status']:
             case DeliveryStatus.ASSIGNED:
                 default['assigned_truck_id'] = _get_next_truck_id()
+            case DeliveryStatus.COMPLETED:
+                default['assigned_truck_id'] = _get_next_truck_id()
+                default['requested_date'] = date.today() - timedelta(days=1)
             case DeliveryStatus.DENIED:
                 default['denial_reason'] = denial_type['reason']
                 default['denial_description'] = denial_type['description']
