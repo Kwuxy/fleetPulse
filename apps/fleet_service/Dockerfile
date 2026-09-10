@@ -9,6 +9,7 @@ COPY --from=builder /root/.local /root/.local
 COPY app /code/app
 COPY migrations /code/migrations
 COPY alembic.ini /code/alembic.ini
+COPY scripts /code/scripts
 ENV PATH=/root/.local/bin:$PATH
 
 EXPOSE 8001

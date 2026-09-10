@@ -52,6 +52,8 @@ Runs Delivery Service's tests, then Fleet Service's, one after the other, stoppi
 docker compose up --build
 docker compose down
 ```
+Alembic migrations and database seeding run automatically as part of `docker compose up`, via one-shot `*_migration`/`*_seed` services per app (see Architecture > Alembic migrations and Architecture > Database seeding below) — no manual `alembic upgrade head` or seed script invocation needed for a Docker Compose run.
+
 See `infra/DEPLOYMENT.md` for details on both options.
 
 **Check Kafka topics were created (after `docker compose up`):**
@@ -114,6 +116,18 @@ Each service's `migrations/env.py` builds its own SQLAlchemy `URL` from the same
 Creating a migration: `.venv/Scripts/python.exe -m alembic revision --autogenerate -m "<message>"` from inside the service directory, same interpreter convention as tests.
 
 Applying a migration: `.venv/Scripts/python.exe -m alembic upgrade head` from inside the service directory, same interpreter convention as tests.
+
+**Automatic migrations via Docker Compose:** `docker-compose.yml` also defines `fleet_service_migration`/`delivery_service_migration`, one-shot services following the same pattern as `kafka_init`/`postgres_init` — built from the same image as their app service, running `alembic upgrade head` as their `command` instead of `uvicorn`, `depends_on: postgres_init` (completed), and exiting once done. Each app service in turn `depends_on` its own migration service (completed), so `docker compose up` always applies pending migrations before the app starts — a manual `alembic upgrade head` is still needed only for local `uvicorn` runs outside Docker. Building this surfaced a Dockerfile gap: both Dockerfiles originally only `COPY`d the `app/` directory, so the migration service failed (missing `alembic.ini`/`migrations/` in the image) until `COPY migrations` and `COPY alembic.ini` were added alongside it.
+
+### Database seeding
+
+Each service has its own `scripts/seed_data.py` (`apps/fleet_service/scripts/`, `apps/delivery_service/scripts/`), a standalone script outside `app/` that clears its service's tables (`truck_repository.clear()` / `delivery_repository.clear()`) and reseeds a fixed, varied dataset: Fleet seeds trucks across all three `TruckStatus` values; Delivery seeds deliveries across all four `DeliveryStatus` values, including denial reasons/descriptions for `DENIED` deliveries. Run locally the same way as tests/migrations — the service's own interpreter, e.g. `.venv/Scripts/python.exe -m scripts.seed_data` from inside the service directory.
+
+`docker-compose.yml` runs both automatically via `fleet_service_seed`/`delivery_service_seed`, one-shot services shaped like the migration services above (same image, `command: python -m scripts.seed_data`, `depends_on` their own service's migration completing). Each app service in turn `depends_on` its own seed service (completed).
+
+**Design decision: reseeds on every `docker compose up`, deliberately.** Because both scripts `clear()` before reseeding, any data created manually through the API (`POST /trucks`, `POST /deliveries`) is wiped the next time the stack comes up — intentional, not a gap. Rationale: it forces a reproducible testing environment on every run, and pushes any data needed repeatedly for manual testing into the seed script itself (keeping it accurate and current) rather than accumulating ad-hoc, undocumented state through the API that only ever exists in one person's local database.
+
+The two scripts are fully independent — no `depends_on` ordering between `fleet_service_seed` and `delivery_service_seed`, and neither script reads the other service's database. They do share a hardcoded pool of 50 truck IDs (`IN_USE_TRUCK_IDS` in Fleet's script, `TRUCK_IDS` in Delivery's — same literal list, `Should match fleet_service seed_data.py repartition` comment in both) so that Delivery's seeded `assigned_truck_id` values line up with trucks Fleet's script actually seeds — a data-narrative convenience, not an enforced or checked constraint.
 
 ### Kafka-based truck assignment
 
@@ -207,6 +221,9 @@ apps/
                          #   assignment_service
       producers/        # assignment_producer — produces TruckAssignmentCompleted onto
                          #   truck-assignment-completed
+    scripts/            # seed_data.py — clears & reseeds a varied truck dataset,
+                         #   run automatically by fleet_service_seed (see Architecture >
+                         #   Database seeding)
     test/
       conftest.py        # postgres_db fixture: disposable Postgres via testcontainers,
                          #   shared by every repository test under truck/ and assignment/
@@ -232,6 +249,9 @@ apps/
                          #   updates delivery status via delivery_service
       producers/        # assignment_producer — produces TruckAssignmentRequest onto
                          #   truck-assignment-requested
+    scripts/            # seed_data.py — clears & reseeds a varied delivery dataset,
+                         #   run automatically by delivery_service_seed (see Architecture >
+                         #   Database seeding)
     test/                # test_delivery_repository, test_delivery_routes,
                          #   test_delivery_service, test_assignment_producer,
                          #   test_assignment_consumer, test_assignment_kafka_integration
@@ -254,7 +274,8 @@ infra/
     shutdown-local.bat  # tears down the K8s deployment
   DEPLOYMENT.md         # local dev setup: Docker Compose vs Kubernetes
 docker-compose.yml       # fleet_service, delivery_service, kafka (KRaft), kafka_init,
-                         #   redpanda_console, postgres, postgres_init
+                         #   redpanda_console, postgres, postgres_init,
+                         #   *_migration + *_seed one-shot services per app
 .env                     # git-ignored — Postgres admin + per-service credentials (see
                          #   Architecture > Postgres); not committed, no .env.example yet
 ```
@@ -269,25 +290,15 @@ docker-compose.yml       # fleet_service, delivery_service, kafka (KRaft), kafka
 - Structured logging (`logging` module, `LOG_LEVEL` env var) in both services
 - Local deployment via Docker Compose (`docker-compose.yml`) and Kubernetes (`infra/k8s/deploy-local.bat` / `shutdown-local.bat`)
 - Kafka bootstrap URL externalized (`KAFKA_BOOTSTRAP_SERVERS`, mutualized via a YAML anchor in `docker-compose.yml`) instead of hardcoded per-service
+- Real persistence via Postgres added to both services — SQLAlchemy ORM models, `truck_repository`/`assignment_repository`/`delivery_repository` rewritten against `asyncpg` (signatures unchanged), first Alembic migrations generated and applied (see Architecture > Postgres and Architecture > Alembic migrations)
+- The `kafka` + `integration` tests redesigned to mock the service layer instead of seeding through the real repository, for both Fleet Service (7 cases) and Delivery Service (5 cases) — see Kafka > Test strategy for the full breakdown, fixture patterns, and the `auto_offset_reset` gap this surfaced in both services' `kafka_client.py`
 - Repository tests for Fleet (`truck_repository`, `assignment_repository`) and Delivery (`delivery_repository`) rewritten against a real, disposable Postgres via `testcontainers[postgresql]` (see Test Conventions for the `postgres_db` fixture pattern and the event-loop gotcha hit along the way)
 - Route tests for Fleet (`truck_routes`) and Delivery (`delivery_routes`) rewritten as `unit` tests mocking the service layer — a reversal of the original plan to move them to `integration`, decided once the repository tests above made a real-DB route test redundant (see Test Conventions for the full reasoning)
+- Alembic migrations and database seeding now run automatically on `docker compose up`, via one-shot `*_migration`/`*_seed` services per app (see Architecture > Alembic migrations and Architecture > Database seeding)
 
 **In progress / Next up:**
-- Add real persistence for Fleet/Delivery Services (currently in-memory only, lost on restart). Prerequisite for the truck position tracking feature below too, since `tracking_service` will need a real repository. Design decisions already made:
-  - **Database per service**, matching the existing Kafka-only inter-service boundary — but one shared `postgres` container in `docker-compose.yml` with two logical databases (`fleet_service`, `delivery_service`), each service only holding credentials to its own — not two separate Postgres containers. Mirrors how Kafka is already one shared broker locally.
-  - **Drift between the two databases is accepted, not solved, for now.** The system was already eventually consistent before persistence (Kafka-only communication, no shared transaction), so this isn't a new problem — what changes is that a lost message becomes a permanent drift instead of resetting on restart. The real fix for that specific gap is the transactional outbox pattern (write the Kafka event to an `outbox` table in the same DB transaction as the state change, relay it separately) — deliberately deferred; for now this remains the same known gap as "Producer delivery confirmation" above (visibility-only, no guaranteed delivery).
-  - Repository function signatures stay unchanged (`save_truck`, `get_truck_by_id`, etc.) — only their internals move from a dict to a real DB, so routes/services/consumers don't change at all. Each repository call opens/closes its own session (no cross-call atomic transactions within a service — a known simplification).
-
-  Planned sequence:
-  1. ✅ `docker-compose.yml` `postgres` + `postgres_init` services and `infra/postgres/init-databases.sh` (see Architecture > Postgres for the mount-path and psql `-c` gotchas).
-  2. ✅ `sqlalchemy[asyncio]` + `asyncpg` + `alembic` added to each service (the usual uv-workspace install gotcha applied — see Test Conventions). `app/clients/db_client.py` added per service, mirroring `kafka_client.py`'s shape: `start_db()`/`stop_db()`, a `get_session()` context manager, and the shared `Base` both services' ORM models inherit from. Each service ran `alembic init -t async migrations` (see Architecture > Alembic migrations for the `env.py` gotchas).
-  3. ✅ SQLAlchemy ORM models (`app/models/orm/truck.py`, `.../delivery.py`), kept separate from the Pydantic domain models — Pydantic stays the API/service-layer boundary. `TruckStatus`/`DeliveryStatus`/`DeliveryDenialReason` are reused directly as `Mapped[SomeEnum]` column types. `Delivery.assigned_truck_id` stays a plain column, never a `relationship()`/`ForeignKey` to `Truck` — Fleet and Delivery are separate Postgres databases, so a cross-database FK isn't possible anyway. `Truck.status` stays stored, not derived (see the `Assignment` history idea under Later for the alternative).
-  4. ✅ `truck_repository`/`assignment_repository`/`delivery_repository` rewritten against Postgres — signatures unchanged (now `async def`), one deliberate rename (`delivery_repository.save` → `save_delivery`, matching `save_truck`'s naming), explicit `_to_orm`/`_from_orm` mapping pairs (no `from_attributes` shortcut). `db_client.get_session()` wraps `.begin()`, so every call gets commit-on-success/rollback-on-exception for free.
-  5. ✅ First Alembic migration for both services, generated and applied (see Architecture > Alembic migrations for the gotchas). Found and fixed a real bug along the way: `get_truck_by_plate_number` did a primary-key lookup via `session.get()` using `plate_number` instead of `id`, so duplicate-plate validation always silently passed — fixed to `select().where(...)`, with `plate_number` given `unique=True` and a follow-up migration to enforce it in Postgres too.
-  6. ✅ Service-layer tests stay `unit` (repository, and Delivery's producer, mocked with `AsyncMock`). Repository tests moved to `integration` via `testcontainers[postgresql]`. Route tests were originally planned to move to `integration` alongside them, but that plan was reversed once the repository tests made a real-DB route test redundant — routes stay `unit`, mocking the service layer instead (see Test Conventions > Route test convention for the full reasoning). CI/CD (running `integration` tests only on push) was raised and explicitly deferred — not decided yet.
-  7. A script to seed the database with a variety of test data, for easier manual testing — once there's a real schema to seed.
+- **Truck position tracking — starting with `gps_simulator`.** First task: obtain the route from pickup to dropoff (the OSRM call, see Planned Features > Truck position tracking below), then simulate a truck's current position along that route as a function of elapsed time on the road. This needs a timestamp marking when a delivery actually went "on the road" (not just `requested_date`, which is a date, not a moment) — a new field to add to the `Delivery` model to compute elapsed time against.
 - Add a volume for Kafka too (currently none, flagged by its own `TODO` in `docker-compose.yml`) — separate from the Postgres persistence work above.
-- **✅ Done — Redesign the `kafka` + `integration` tests to mock the service layer**, for both Fleet Service (7 cases) and Delivery Service (5 cases) — see Kafka > Test strategy above for the full breakdown, fixture patterns, and the `auto_offset_reset` gap this surfaced in both services' `kafka_client.py`.
 - **Add a dedicated end-to-end test tier**, spanning both services, alongside the existing per-service `unit`/`kafka + integration` tests. Motivating gap: every test in the project today (unit and `kafka + integration` alike) is scoped to one service's own code and its own copy of the Kafka message schemas — and Fleet's and Delivery's copies of `TruckAssignmentRequest`/`TruckAssignmentCompleted` are deliberately independent, not shared (see Kafka above). A schema drift between the two (e.g. one side renaming a field) would pass every existing test undetected, since each side only ever checks its own copy against itself — only a real cross-service test can catch that class of bug. Design constraints already identified:
   - Both services' internal package is literally named `app` (`apps/fleet_service/app`, `apps/delivery_service/app`), so a single Python test process can't import both at once — they'd collide. E2E tests are therefore necessarily true black-box tests against real, running HTTP endpoints (via `docker compose up`, or two separately-launched `uvicorn` processes), never in-process imports the way every existing suite works.
   - Likely doesn't need direct DB access or `testcontainers[postgresql]` at all: the API's own documented contract already exposes the eventually-consistent result through the public surface (`POST /trucks` on Fleet, `POST /deliveries` on Delivery, then poll `GET /deliveries/{id}` until it leaves `REQUESTED`) — asserting through that surface is more faithful "black box" testing than reaching into either service's internal schema/DB directly, and sidesteps the package-name collision above entirely.
@@ -300,13 +311,13 @@ docker-compose.yml       # fleet_service, delivery_service, kafka (KRaft), kafka
 - Monitoring and logging (e.g., Prometheus/Grafana, ELK stack)
 - Organize `docker-compose.yml`'s growing container list (~a dozen services now: `fleet_service`, `delivery_service`, `kafka`, `kafka_init`, `redpanda_console`, `postgres`, `postgres_init`) for readability. Options worth weighing: Compose `profiles` (start subsets, e.g. `--profile kafka` vs. everything), splitting into multiple compose files combined via `-f`, or just better in-file grouping/comments. Leaning toward splitting into multiple files by directory, tentatively something like `apps/`, `init/`, `database/`, `queue/` — open question is whether to group by resource (e.g. `kafka` + `kafka_init` + `redpanda_console` together) or by lifecycle role (all one-shot init jobs together regardless of resource). Not decided yet.
 - Add a database UI for manually browsing/querying Postgres content, parallel to Redpanda Console's role for Kafka — candidates raised: pgAdmin (heaviest, full-featured), Adminer (lightweight, generic), pgweb (lightweight, Postgres-only). Would likely connect as `fleetpulse_admin` to browse both `fleet_service` and `delivery_service` from one instance, since it's a human inspection tool rather than a service credential. Not decided yet; likely lands in the `database/` group above once the container reorg above happens.
-- Auto-run `alembic upgrade head` on `docker compose up` per service, instead of a manual local command. Likely shaped like `kafka_init`/`postgres_init` — either a one-shot `*_migrate` service per app service, or a migration step in each app container's entrypoint before `uvicorn` starts — and must run after `postgres_init`'s schema grants (see "Postgres 15+ schema-privilege gotcha" above).
 
 ## Planned Features
 
 ### Truck position tracking
 - `gps_simulator` — a new service, a bare `asyncio` worker rather than a FastAPI app (no inbound HTTP traffic, nothing calls it — a real truck's telematics unit wouldn't expose a web API either). Loops over active trucks and produces a position update onto a new `truck-position-updates` topic on an interval (target ~10s–1min), walking along a route obtained from an external routing API.
 - Routing: a call to an external routing API to get the path from pickup to dropoff. OSRM's public demo server (`router.project-osrm.org`) is the likely choice for a learning project, since it needs no API key.
+- Simulating a truck's current position: once the route (a sequence of coordinates) is known, position at any moment is derived from elapsed time since the delivery started moving. This requires a "delivery went on the road" timestamp — not currently on the `Delivery` model (`requested_date` is a plain date, not a moment) — planned as a new field, set once a delivery is `ASSIGNED`.
 - `tracking_service` — a new FastAPI service: consumes `truck-position-updates`, keeps an in-memory `{truck_id: latest_position}` cache (serves live reads without touching Kafka/DB per request), persists to a repository on a throttle rather than on every message (storage only needs a rough idea of where a truck is, not perfect accuracy), and exposes a WebSocket endpoint so clients get live position pushes.
 - Open design question, deliberately deferred until both services exist: should `gps_simulator` produce directly onto Kafka, or call an HTTP route on `tracking_service` which produces on its behalf?
 - `truck-position-updates` will likely be a compacted topic (`cleanup.policy=compact`, keyed by `truck_id`), since only the latest position matters — unlike the existing two topics, which use default retention.

@@ -25,6 +25,8 @@ services:
         condition: service_completed_successfully
       fleet_service_migration:
         condition: service_completed_successfully
+      fleet_service_seed:
+        condition: service_completed_successfully
 
   delivery_service:
     build: ./apps/delivery_service
@@ -51,6 +53,8 @@ services:
       postgres_init:
         condition: service_completed_successfully
       delivery_service_migration:
+        condition: service_completed_successfully
+      delivery_service_seed:
         condition: service_completed_successfully
 
   kafka:
@@ -164,6 +168,36 @@ services:
     command: alembic upgrade head
     depends_on:
       postgres_init:
+        condition: service_completed_successfully
+
+  fleet_service_seed:
+    build: ./apps/fleet_service
+    environment:
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_DB: ${FLEET_SERVICE_DB_NAME}
+      POSTGRES_USER: ${FLEET_SERVICE_DB_USER}
+      POSTGRES_PASSWORD: ${FLEET_SERVICE_DB_PASSWORD}
+    command: python -m scripts.seed_data
+    depends_on:
+      postgres_init:
+        condition: service_completed_successfully
+      fleet_service_migration:
+        condition: service_completed_successfully
+
+  delivery_service_seed:
+    build: ./apps/delivery_service
+    environment:
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_DB: ${DELIVERY_SERVICE_DB_NAME}
+      POSTGRES_USER: ${DELIVERY_SERVICE_DB_USER}
+      POSTGRES_PASSWORD: ${DELIVERY_SERVICE_DB_PASSWORD}
+    command: python -m scripts.seed_data
+    depends_on:
+      postgres_init:
+        condition: service_completed_successfully
+      delivery_service_migration:
         condition: service_completed_successfully
 
 volumes:

@@ -47,6 +47,9 @@ def _get_delivery_cargo_weight_kg(size: str) -> int:
 
 
 def _override_env_variables() -> None:
+    if os.environ.get('POSTGRES_USER') is not None:
+        return
+
     # Override the default .env file
     from dotenv import dotenv_values
     env_values = dotenv_values(Path(__file__).parents[3] / ".env")  # repo root
