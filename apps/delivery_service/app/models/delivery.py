@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import datetime
 from enum import Enum
 from pydantic import BaseModel
 
@@ -21,7 +21,7 @@ class Delivery(BaseModel):
     pickup_location: str
     dropoff_location: str
     cargo_weight_kg: int
-    requested_date: date
+    requested_datetime: datetime
     status: DeliveryStatus
     assigned_truck_id: str | None
     denial_reason: DeliveryDenialReason | None = None
@@ -32,4 +32,4 @@ class CreateDeliveryRequest(BaseModel):
     pickup_location: str
     dropoff_location: str
     cargo_weight_kg: int
-    requested_date: date
+    requested_datetime: datetime

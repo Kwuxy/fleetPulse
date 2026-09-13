@@ -1,5 +1,5 @@
 import uuid
-from datetime import date
+from datetime import datetime
 
 from app.producers import assignment_producer
 from app.exceptions import InvalidClient, SameLocationsException, InvalidCargo, InvalidRequestedDate, NotFoundException
@@ -18,8 +18,8 @@ async def create_delivery(request: CreateDeliveryRequest) -> Delivery:
     if not _cargo_is_valid(request.cargo_weight_kg):
         raise InvalidCargo(request.cargo_weight_kg)
 
-    if not _date_is_valid(request.requested_date):
-        raise InvalidRequestedDate(request.requested_date)
+    if not _date_is_valid(request.requested_datetime):
+        raise InvalidRequestedDate(request.requested_datetime)
 
     delivery = Delivery(
         id=_generate_delivery_id(),
@@ -55,8 +55,8 @@ def _locations_are_different(pickup_location: str, dropoff_location: str) -> boo
 def _cargo_is_valid(cargo_weight_kg: int) -> bool:
     return cargo_weight_kg > 0
 
-def _date_is_valid(requested_date: date) -> bool:
-    return requested_date > date.today()
+def _date_is_valid(requested_datetime: datetime) -> bool:
+    return requested_datetime > datetime.today()
 
 def _generate_delivery_id():
     return f"delivery-{uuid.uuid4().hex[:8]}"

@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import datetime
 
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -14,7 +14,7 @@ class Delivery(Base):
     pickup_location: Mapped[str]
     dropoff_location: Mapped[str]
     cargo_weight_kg: Mapped[int]
-    requested_date: Mapped[date]
+    requested_date: Mapped[datetime]
     status: Mapped[DeliveryStatus] = mapped_column(default=DeliveryStatus.REQUESTED)
     assigned_truck_id: Mapped[str | None]
     denial_reason: Mapped[DeliveryDenialReason | None]

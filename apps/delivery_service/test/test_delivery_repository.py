@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import timedelta, datetime
 
 import pytest
 import pytest_asyncio
@@ -14,7 +14,7 @@ def _get_delivery(**overrides):
         pickup_location="Test Location",
         dropoff_location="Test Destination",
         cargo_weight_kg=200,
-        requested_date=(date.today() + timedelta(days=1)),
+        requested_datetime=(datetime.today() + timedelta(days=1)),
         status=DeliveryStatus.REQUESTED,
         assigned_truck_id=None
     )

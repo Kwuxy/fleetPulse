@@ -1,5 +1,5 @@
 import asyncio
-from datetime import date, timedelta
+from datetime import timedelta, datetime
 from unittest.mock import AsyncMock
 
 import pytest
@@ -35,7 +35,7 @@ class TestDeliveryService:
                 pickup_location="Brussels",
                 dropoff_location="Paris",
                 cargo_weight_kg=700,
-                requested_date=date.today() + timedelta(days=1),
+                requested_datetime=datetime.today() + timedelta(days=1),
             )
             defaults.update(overrides)
             return CreateDeliveryRequest(**defaults)
@@ -58,7 +58,7 @@ class TestDeliveryService:
             assert delivery.cargo_weight_kg == 700
             assert delivery.status == DeliveryStatus.REQUESTED
             assert delivery.assigned_truck_id is None
-            assert delivery.requested_date == request.requested_date
+            assert delivery.requested_datetime == request.requested_datetime
             assert delivery.denial_reason is None
             assert delivery.denial_description is None
 
@@ -105,12 +105,12 @@ class TestDeliveryService:
             mock_save_delivery.assert_not_awaited()
             mock_produce_truck_assignment_requested.assert_not_awaited()
 
-        def test_create_delivery_rejects_today_as_requested_date(self,
+        def test_create_delivery_rejects_today_as_requested_datetime(self,
                                                                  mock_produce_truck_assignment_requested,
                                                                  mock_save_delivery
                                                                  ):
             # - Arrange -
-            request = self._get_create_delivery_request(requested_date=date.today())
+            request = self._get_create_delivery_request(requested_datetime=datetime.today())
 
             # - Act -
             with pytest.raises(InvalidRequestedDate):
@@ -268,7 +268,7 @@ class TestDeliveryService:
             pickup_location="Brussels",
             dropoff_location="Paris",
             cargo_weight_kg=700,
-            requested_date=date.today() + timedelta(days=1),
+            requested_datetime=datetime.today() + timedelta(days=1),
             status=DeliveryStatus.REQUESTED,
             assigned_truck_id=None
         )

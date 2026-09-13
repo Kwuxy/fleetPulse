@@ -1,5 +1,5 @@
 import pytest
-from datetime import date, timedelta
+from datetime import timedelta, datetime
 from unittest.mock import AsyncMock
 
 from fastapi.testclient import TestClient
@@ -19,7 +19,7 @@ def _get_delivery(**overrides):
         'pickup_location': "Brussels",
         'dropoff_location': "Paris",
         'cargo_weight_kg': 700,
-        'requested_date': date.today() + timedelta(days=1),
+        'requested_datetime': datetime.today() + timedelta(days=1),
         'status': DeliveryStatus.REQUESTED,
         'assigned_truck_id': None
     }
@@ -38,7 +38,7 @@ class TestDeliveryRoutes:
                 "pickup_location": "Brussels",
                 "dropoff_location": "Paris",
                 "cargo_weight_kg": 700,
-                "requested_date": str(date.today() + timedelta(days=1)),
+                "requested_datetime": str(datetime.today() + timedelta(days=1)),
             }
             defaults.update(overrides)
             return defaults
@@ -75,14 +75,14 @@ class TestDeliveryRoutes:
             raise InvalidCargo(req.cargo_weight_kg)
 
         @staticmethod
-        def raise_invalid_requested_date(req: CreateDeliveryRequest):
-            raise InvalidRequestedDate(req.requested_date)
+        def raise_invalid_requested_datetime(req: CreateDeliveryRequest):
+            raise InvalidRequestedDate(req.requested_datetime)
 
         @pytest.mark.parametrize('side_effect_exception, payload', [
             (raise_invalid_client, _get_valid_payload()),
             (raise_same_locations, _get_valid_payload(pickup_location='Paris', dropoff_location='Paris')),
             (raise_invalid_cargo, _get_valid_payload(cargo_weight_kg=0)),
-            (raise_invalid_requested_date, _get_valid_payload(requested_date=str(date.today() - timedelta(days=1)))),
+            (raise_invalid_requested_datetime, _get_valid_payload(requested_datetime=str(datetime.today() - timedelta(days=1)))),
         ])
         def test_create_deliveries_endpoint_rejects_exceptions(self, monkeypatch, side_effect_exception, payload):
             # - Arrange -
