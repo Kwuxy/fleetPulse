@@ -21,7 +21,7 @@ request:
         const moment = require("moment");
 
         function generate_date(days) {
-          return moment().add(days, 'days').format("YYYY-MM-DD");
+          return moment().add(days, 'days').format("YYYY-MM-DD hh:mm:ss");
         }
 
         function generate_license_plate() {
