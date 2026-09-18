@@ -20,3 +20,11 @@ class InvalidRequestedDate(Exception):
 class NotFoundException(Exception):
     def __init__(self, delivery_id: str):
         super().__init__(f"Delivery not found: {delivery_id}")
+
+class OSRMRequestFailed(Exception):
+    def __init__(self, msg: str):
+        super().__init__(msg)
+
+class UnknownCity(Exception):
+    def __init__(self, city_name: str):
+        super().__init__(f"Unknown city `{city_name}` in osrm_client config")

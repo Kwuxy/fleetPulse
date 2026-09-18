@@ -39,6 +39,7 @@ services:
       POSTGRES_DB: ${DELIVERY_SERVICE_DB_NAME}
       POSTGRES_USER: ${DELIVERY_SERVICE_DB_USER}
       POSTGRES_PASSWORD: ${DELIVERY_SERVICE_DB_PASSWORD}
+      OSRM_URL: http://router.project-osrm.org
       LOG_LEVEL: INFO
     volumes:
       - ./apps/delivery_service/app:/code/app  # Volume for hot reloading
