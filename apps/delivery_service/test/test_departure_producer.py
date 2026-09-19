@@ -64,6 +64,6 @@ class TestDepartureProducer:
             # - Assert mock calls -
             mock_future.add_done_callback.assert_called_once()
             callback = mock_future.add_done_callback.call_args.args[0]
-            assert callback.func is departure_producer._log_send_failure
+            assert callback.func is kafka_client.log_send_failure
             assert callback.args == ("truck-assignment-requested", "delivery-abc123")
 

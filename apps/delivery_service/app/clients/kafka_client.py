@@ -104,3 +104,8 @@ def get_producer() -> AIOKafkaProducer:
     if _producer is None:
         raise RuntimeError("Producer is not started")
     return _producer
+
+def log_send_failure(topic: str, key: str, future: asyncio.Future) -> None:
+    exc = future.exception()
+    if exc is not None:
+        logger.error("Failed to deliver message to %s (key=%s): %s", topic, key, exc, exc_info=exc)
