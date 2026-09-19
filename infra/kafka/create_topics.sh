@@ -2,7 +2,7 @@
 set -e
 
 KAFKA_URL="${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}"
-topics="truck-assignment-requested:1 truck-assignment-completed:1"
+topics="truck-assignment-requested:1 truck-assignment-completed:1 truck-departure-scheduled:1"
 
 for topic in $topics; do
   name=${topic%%:*}
