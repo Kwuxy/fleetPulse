@@ -35,7 +35,7 @@ class TestDepartureProducer:
 
             # - Assert mock calls -
             mock_producer.send.assert_awaited_once_with(
-                "delivery-departure-scheduled",
+                "truck-departure-scheduled",
                 key="delivery-abc123",
                 value=request.model_dump(mode="json"),
             )
@@ -65,5 +65,4 @@ class TestDepartureProducer:
             mock_future.add_done_callback.assert_called_once()
             callback = mock_future.add_done_callback.call_args.args[0]
             assert callback.func is kafka_client.log_send_failure
-            assert callback.args == ("truck-assignment-requested", "delivery-abc123")
-
+            assert callback.args == ("truck-departure-scheduled", "delivery-abc123")

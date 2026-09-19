@@ -1,4 +1,3 @@
-import asyncio
 import logging
 
 from app.models.truck_departure import TruckDepartureScheduled
