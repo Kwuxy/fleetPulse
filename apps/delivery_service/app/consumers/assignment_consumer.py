@@ -5,7 +5,7 @@ from pydantic import ValidationError
 from app.clients.kafka_client import QueueMessageStatus
 from app.models.truck_assignment import TruckAssignmentCompleted
 from app.services import delivery_service
-from app.exceptions import NotFoundException
+from app.exceptions import NotFoundException, UnassignedTruckOnCompletedAssignment, UnknownCity, OSRMRequestFailed
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ async def handle_truck_assignment_completed(msg: dict) -> QueueMessageStatus:
 
     try:
         await delivery_service.update_delivery_with_truck_assignment(assignment)
-    except NotFoundException as e:
+    except (NotFoundException, UnassignedTruckOnCompletedAssignment, UnknownCity) as e:
         logger.warning(f'Error while consuming truck assignment completed: {e}')
         return QueueMessageStatus.CONSUMED
 

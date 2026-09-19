@@ -1,11 +1,14 @@
 import uuid
 from datetime import datetime
 
-from app.producers import assignment_producer
-from app.exceptions import InvalidClient, SameLocationsException, InvalidCargo, InvalidRequestedDate, NotFoundException
+from app.producers import assignment_producer, departure_producer
+from app.exceptions import InvalidClient, SameLocationsException, InvalidCargo, InvalidRequestedDate, NotFoundException, \
+    UnassignedTruckOnCompletedAssignment
 from app.models.delivery import Delivery, CreateDeliveryRequest, DeliveryStatus
 from app.repositories import delivery_repository
 from app.models.truck_assignment import TruckAssignmentCompleted, TruckAssignmentRequest
+from app.models.truck_departure import TruckDepartureScheduled, Coordinates
+from app.clients import osrm_client
 
 
 async def create_delivery(request: CreateDeliveryRequest) -> Delivery:
@@ -45,6 +48,25 @@ async def update_delivery_with_truck_assignment(assignment: TruckAssignmentCompl
         delivery.denial_description = assignment.description
 
     await delivery_repository.save_delivery(delivery)
+
+    if not assignment.assigned:
+        return
+
+    await _call_truck_departure_scheduled(delivery)
+
+async def _call_truck_departure_scheduled(delivery: Delivery) -> None:
+    if delivery.assigned_truck_id is None:
+        raise UnassignedTruckOnCompletedAssignment(delivery.id)
+
+    departure_time = delivery.requested_datetime - await osrm_client.get_route_duration(delivery.pickup_location, delivery.dropoff_location)
+    request = TruckDepartureScheduled(
+        delivery_id=delivery.id,
+        truck_id=delivery.assigned_truck_id,
+        pickup_location=Coordinates(**osrm_client.get_city_coordinates(delivery.pickup_location)),
+        dropoff_location=Coordinates(**osrm_client.get_city_coordinates(delivery.dropoff_location)),
+        departure_time=departure_time,
+    )
+    await departure_producer.produce_truck_departure_scheduled(request)
 
 def _client_exist(client_id: int) -> bool:
     return True

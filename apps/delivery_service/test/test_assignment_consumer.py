@@ -6,7 +6,7 @@ from pydantic import ValidationError
 
 from app.clients.kafka_client import QueueMessageStatus
 from app.consumers import assignment_consumer
-from app.exceptions import NotFoundException
+from app.exceptions import NotFoundException, UnassignedTruckOnCompletedAssignment, UnknownCity
 from app.models.truck_assignment import TruckAssignmentCompleted, TruckAssignmentFailureReason
 from app.services import delivery_service
 
@@ -85,12 +85,24 @@ class TestAssignmentConsumer:
             # - Assert mock calls -
             mock_update_delivery_with_truck_assignment.assert_awaited_once_with(expected_result)
 
-        def test_returns_consumed_without_raising_on_unknown_delivery(self, monkeypatch):
-            # - Arrange -
-            def raise_not_found(assignment):
-                raise NotFoundException(assignment.delivery_id)
+        @staticmethod
+        def raise_not_found(assignment):
+            raise NotFoundException(assignment.delivery_id)
 
-            mock_update_delivery_with_truck_assignment = AsyncMock(side_effect=raise_not_found)
+        @staticmethod
+        def raise_unassigned_truck_on_completed_assignment(assignment):
+            raise UnassignedTruckOnCompletedAssignment(assignment.delivery_id)
+
+        @staticmethod
+        def raise_unknown_city(_):
+            raise UnknownCity('Mock city')
+
+        @pytest.mark.parametrize("side_effect_exception", [
+            raise_not_found, raise_unassigned_truck_on_completed_assignment, raise_unknown_city
+        ])
+        def test_returns_consumed_without_raising_on_update_delivery_error(self, monkeypatch, side_effect_exception):
+            # - Arrange -
+            mock_update_delivery_with_truck_assignment = AsyncMock(side_effect=side_effect_exception)
             monkeypatch.setattr(delivery_service, "update_delivery_with_truck_assignment",
                                 mock_update_delivery_with_truck_assignment)
 

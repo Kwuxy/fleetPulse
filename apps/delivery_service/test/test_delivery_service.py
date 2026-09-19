@@ -1,15 +1,18 @@
 import asyncio
 from datetime import timedelta, datetime
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from app.exceptions import InvalidCargo, InvalidRequestedDate, SameLocationsException, NotFoundException
-from app.models.delivery import CreateDeliveryRequest, DeliveryStatus, DeliveryDenialReason, Delivery
+from app.exceptions import InvalidCargo, InvalidRequestedDate, SameLocationsException, NotFoundException, \
+    UnassignedTruckOnCompletedAssignment
+from app.models.delivery import CreateDeliveryRequest, DeliveryStatus, Delivery
 from app.models.truck_assignment import TruckAssignmentCompleted, TruckAssignmentFailureReason
-from app.producers import assignment_producer
+from app.models.truck_departure import Coordinates
+from app.producers import assignment_producer, departure_producer
 from app.repositories import delivery_repository
 from app.services import delivery_service
+from app.clients import osrm_client
 
 
 @pytest.mark.service
@@ -124,6 +127,12 @@ class TestDeliveryService:
             mock_produce_truck_assignment_requested.assert_not_awaited()
 
     class TestUpdateDeliveryFromTruckAssignmentCompleted:
+        @pytest.fixture(autouse=True)
+        def mock_produce_truck_departure_scheduled(self, monkeypatch):
+            mock = AsyncMock()
+            monkeypatch.setattr(departure_producer, "produce_truck_departure_scheduled", mock)
+            return mock
+
         @staticmethod
         def _get_create_truck_assignment_completed_success(**overrides):
             defaults = dict(
@@ -146,11 +155,17 @@ class TestDeliveryService:
             defaults.update(overrides)
             return TruckAssignmentCompleted(**defaults)
 
-        def test_sets_status_assigned_and_truck_id_when_assigned(self, monkeypatch, mock_save_delivery):
+        def test_sets_status_assigned_and_truck_id_when_assigned(self, monkeypatch,
+                                                                 mock_produce_truck_departure_scheduled,
+                                                                 mock_save_delivery):
             # - Arrange -
             delivery = TestDeliveryService._get_initial_deliveries()[0]
             mock_get_deliveries_by_id = AsyncMock(return_value=delivery)
             monkeypatch.setattr(delivery_repository, "get_delivery_by_id", mock_get_deliveries_by_id)
+            mock_get_city_coordinates = Mock(side_effect=[{'lat': 1.0, 'lon': 2.3}, {'lat': 10.7, 'lon': 20.5}])
+            monkeypatch.setattr(osrm_client, "get_city_coordinates", mock_get_city_coordinates)
+            mock_get_route_duration = AsyncMock(return_value=timedelta(minutes=20))
+            monkeypatch.setattr(osrm_client, "get_route_duration", mock_get_route_duration)
 
             assignment = self._get_create_truck_assignment_completed_success()
 
@@ -166,14 +181,24 @@ class TestDeliveryService:
             # - Assert mock calls -
             mock_save_delivery.assert_awaited_once_with(delivery)
             mock_get_deliveries_by_id.assert_awaited_once_with(assignment.delivery_id)
+            mock_produce_truck_departure_scheduled.assert_awaited_once()
+            sent_request = mock_produce_truck_departure_scheduled.await_args.args[0]
+            assert sent_request.delivery_id == delivery.id
+            assert sent_request.truck_id == delivery.assigned_truck_id
+            assert sent_request.pickup_location == Coordinates(lat=1.0, lon=2.3)
+            assert sent_request.dropoff_location == Coordinates(lat=10.7, lon=20.5)
+            assert sent_request.departure_time == delivery.requested_datetime - timedelta(minutes=20)
 
         @pytest.mark.parametrize("reason, description", [
             (TruckAssignmentFailureReason.INVALID_REQUEST, "Invalid request"),
             (TruckAssignmentFailureReason.NO_AVAILABLE_TRUCK, "No truck available"),
         ],
                                  )
-        def test_sets_status_denied(self, monkeypatch, mock_save_delivery,
-                                    reason, description):
+        def test_sets_status_denied(self, monkeypatch,
+                                    mock_produce_truck_departure_scheduled,
+                                    mock_save_delivery,
+                                    reason,
+                                    description):
             # - Arrange -
             delivery = TestDeliveryService._get_initial_deliveries()[0]
             mock_get_deliveries_by_id = AsyncMock(return_value=delivery)
@@ -193,8 +218,33 @@ class TestDeliveryService:
             # - Assert mock calls -
             mock_save_delivery.assert_awaited_once()
             mock_get_deliveries_by_id.assert_awaited_once_with(assignment.delivery_id)
+            mock_produce_truck_departure_scheduled.assert_not_awaited()
 
-        def test_raises_not_found_for_unknown_delivery_id(self, monkeypatch, mock_save_delivery):
+        def test_raises_unassigned_truck_on_completed_assignment_for_no_assigned_truck(self, monkeypatch,
+                                                                               mock_produce_truck_departure_scheduled,
+                                                                               mock_save_delivery):
+            # - Arrange -
+            delivery = TestDeliveryService._get_initial_deliveries()[0]
+            mock_get_deliveries_by_id = AsyncMock(return_value=delivery)
+            monkeypatch.setattr(delivery_repository, "get_delivery_by_id", mock_get_deliveries_by_id)
+
+            assignment = self._get_create_truck_assignment_completed_success(truck_id=None)
+
+            # - Act -
+            with pytest.raises(UnassignedTruckOnCompletedAssignment):
+                asyncio.run(delivery_service.update_delivery_with_truck_assignment(assignment))
+
+            # - Assert Result -
+            # Exception raised, no assertions needed
+
+            # - Assert mock calls -
+            mock_save_delivery.assert_awaited_once()
+            mock_get_deliveries_by_id.assert_awaited_once_with(assignment.delivery_id)
+            mock_produce_truck_departure_scheduled.assert_not_awaited()
+
+        def test_raises_not_found_for_unknown_delivery_id(self, monkeypatch,
+                                                          mock_produce_truck_departure_scheduled,
+                                                          mock_save_delivery):
             # - Arrange -
             mock_get_deliveries_by_id = AsyncMock(return_value=None)
             monkeypatch.setattr(delivery_repository, "get_delivery_by_id", mock_get_deliveries_by_id)
@@ -211,6 +261,7 @@ class TestDeliveryService:
             # - Assert mock calls -
             mock_save_delivery.assert_not_awaited()
             mock_get_deliveries_by_id.assert_awaited_once_with(assignment.delivery_id)
+            mock_produce_truck_departure_scheduled.assert_not_awaited()
 
     class TestGetDeliveries:
         def test_get_deliveries_returns_deliveries_from_repository(self, monkeypatch):

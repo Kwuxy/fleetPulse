@@ -28,3 +28,7 @@ class OSRMRequestFailed(Exception):
 class UnknownCity(Exception):
     def __init__(self, city_name: str):
         super().__init__(f"Unknown city `{city_name}` in osrm_client config")
+
+class UnassignedTruckOnCompletedAssignment(Exception):
+    def __init__(self, delivery_id: str):
+        super().__init__(f"Delivery {delivery_id} has no assigned truck")
