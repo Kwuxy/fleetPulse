@@ -14,4 +14,4 @@ package = false
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
-testpaths = ["apps/fleet_service/test", "apps/delivery_service/test"]
+testpaths = ["apps/fleet_service/test", "apps/delivery_service/test", "apps/gps_simulator/test"]
