@@ -85,7 +85,7 @@ def _get_deliveries(nb: int, **overrides) -> list[Delivery]:
             'pickup_location': locations['pickup'],
             'dropoff_location': locations['dropoff'],
             'cargo_weight_kg': _get_delivery_cargo_weight_kg(weight_type),
-            'requested_date': date.today() + timedelta(days=1),
+            'requested_datetime': date.today() + timedelta(days=1),
             'status': DeliveryStatus.REQUESTED,
             'assigned_truck_id': None,
             'denial_reason': None,
@@ -98,7 +98,7 @@ def _get_deliveries(nb: int, **overrides) -> list[Delivery]:
                 default['assigned_truck_id'] = _get_next_truck_id()
             case DeliveryStatus.COMPLETED:
                 default['assigned_truck_id'] = _get_next_truck_id()
-                default['requested_date'] = date.today() - timedelta(days=1)
+                default['requested_datetime'] = date.today() - timedelta(days=1)
             case DeliveryStatus.DENIED:
                 default['denial_reason'] = denial_type['reason']
                 default['denial_description'] = denial_type['description']
