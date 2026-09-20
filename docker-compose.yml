@@ -61,10 +61,16 @@ services:
   gps_simulator:
     build: ./apps/gps_simulator
     environment:
+      KAFKA_BOOTSTRAP_SERVERS: *kafka-bootstrap
       LOG_LEVEL: INFO
     volumes:
       - ./apps/gps_simulator/app:/code/app  # Mounted so `docker compose restart gps_simulator` picks up local edits without a rebuild
     command: python -m app.main
+    depends_on:
+      kafka:
+        condition: service_healthy
+      kafka_init:
+        condition: service_completed_successfully
 
   kafka:
     image: confluentinc/cp-kafka:latest
