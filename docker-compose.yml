@@ -62,6 +62,11 @@ services:
     build: ./apps/gps_simulator
     environment:
       KAFKA_BOOTSTRAP_SERVERS: *kafka-bootstrap
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_DB: ${GPS_SIMULATOR_DB_NAME}
+      POSTGRES_USER: ${GPS_SIMULATOR_DB_USER}
+      POSTGRES_PASSWORD: ${GPS_SIMULATOR_DB_PASSWORD}
       LOG_LEVEL: INFO
     volumes:
       - ./apps/gps_simulator/app:/code/app  # Mounted so `docker compose restart gps_simulator` picks up local edits without a rebuild
@@ -70,6 +75,12 @@ services:
       kafka:
         condition: service_healthy
       kafka_init:
+        condition: service_completed_successfully
+      postgres_init:
+        condition: service_completed_successfully
+      gps_simulator_migration:
+        condition: service_completed_successfully
+      gps_simulator_seed:
         condition: service_completed_successfully
 
   kafka:
@@ -150,6 +161,9 @@ services:
       DELIVERY_SERVICE_DB_USER: ${DELIVERY_SERVICE_DB_USER}
       DELIVERY_SERVICE_DB_PASSWORD: ${DELIVERY_SERVICE_DB_PASSWORD}
       DELIVERY_SERVICE_DB_NAME: ${DELIVERY_SERVICE_DB_NAME}
+      GPS_SIMULATOR_DB_USER: ${GPS_SIMULATOR_DB_USER}
+      GPS_SIMULATOR_DB_PASSWORD: ${GPS_SIMULATOR_DB_PASSWORD}
+      GPS_SIMULATOR_DB_NAME: ${GPS_SIMULATOR_DB_NAME}
     depends_on:
       postgres:
         condition: service_healthy
@@ -185,6 +199,19 @@ services:
       postgres_init:
         condition: service_completed_successfully
 
+  gps_simulator_migration:
+    build: ./apps/gps_simulator
+    environment:
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_DB: ${GPS_SIMULATOR_DB_NAME}
+      POSTGRES_USER: ${GPS_SIMULATOR_DB_USER}
+      POSTGRES_PASSWORD: ${GPS_SIMULATOR_DB_PASSWORD}
+    command: alembic upgrade head
+    depends_on:
+      postgres_init:
+        condition: service_completed_successfully
+
   fleet_service_seed:
     build: ./apps/fleet_service
     environment:
@@ -213,6 +240,21 @@ services:
       postgres_init:
         condition: service_completed_successfully
       delivery_service_migration:
+        condition: service_completed_successfully
+
+  gps_simulator_seed:
+    build: ./apps/gps_simulator
+    environment:
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_DB: ${GPS_SIMULATOR_DB_NAME}
+      POSTGRES_USER: ${GPS_SIMULATOR_DB_USER}
+      POSTGRES_PASSWORD: ${GPS_SIMULATOR_DB_PASSWORD}
+    command: python -m scripts.seed_data
+    depends_on:
+      postgres_init:
+        condition: service_completed_successfully
+      gps_simulator_migration:
         condition: service_completed_successfully
 
 volumes:

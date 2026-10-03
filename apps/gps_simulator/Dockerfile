@@ -7,6 +7,9 @@ FROM python:3.14-slim
 WORKDIR /code
 COPY --from=builder /root/.local /root/.local
 COPY app /code/app
+COPY migrations /code/migrations
+COPY alembic.ini /code/alembic.ini
+COPY scripts /code/scripts
 ENV PATH=/root/.local/bin:$PATH
 
 CMD ["python", "-m", "app.main"]

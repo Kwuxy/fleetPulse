@@ -5,6 +5,7 @@ import signal
 
 from app.clients import kafka_client
 from app.consumers import departure_consumer
+from app.clients import db_client
 
 logging.basicConfig(
     level=os.environ.get("LOG_LEVEL", "INFO"),
@@ -17,7 +18,6 @@ logger = logging.getLogger(__name__)
 async def keep_app_alive() -> None:
     shutdown_event = asyncio.Event()
     for sig in (signal.SIGTERM, signal.SIGINT):
-        logger.info(f"gps_simulator received signal {sig}")
         try:
             asyncio.get_running_loop().add_signal_handler(sig, shutdown_event.set)
         except NotImplementedError:
@@ -28,9 +28,11 @@ async def keep_app_alive() -> None:
 
 async def main() -> None:
     logger.info("gps_simulator started")
+    await db_client.start_db()
     await kafka_client.start_consuming(departure_consumer.handle_truck_departure_scheduled)
     await keep_app_alive()
     await kafka_client.stop_consuming()
+    await db_client.stop_db()
     logger.info("gps_simulator ended")
 
 
