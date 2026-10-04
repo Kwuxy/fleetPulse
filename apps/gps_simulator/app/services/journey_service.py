@@ -3,10 +3,10 @@ from app.models.journey import Journey
 from app.repositories import journey_repository
 
 
-async def create_journey(departure: TruckDepartureScheduled) -> None:
+async def create_journey(departure: TruckDepartureScheduled) -> Journey:
     journey = _build_journey_from_truck_departure(departure)
-
     await journey_repository.save_journey(journey)
+    return journey
 
 
 def _build_journey_from_truck_departure(departure: TruckDepartureScheduled) -> Journey:
