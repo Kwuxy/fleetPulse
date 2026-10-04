@@ -31,4 +31,5 @@ markers = [
 [dependency-groups]
 dev = [
     "pytest-asyncio>=1.4.0",
+    "testcontainers[kafka]>=4.15.0",
 ]
