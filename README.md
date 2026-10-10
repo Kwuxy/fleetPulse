@@ -55,7 +55,7 @@ The services never call each other over HTTP: Kafka is the only integration chan
 | Persistence | PostgreSQL, SQLAlchemy 2 (async, asyncpg), Alembic migrations |
 | External APIs | OSRM routing via httpx |
 | Testing | pytest, pytest-asyncio, Testcontainers (Kafka & Postgres), respx |
-| Infrastructure | Docker, Docker Compose, Kubernetes (local), uv workspace |
+| Infrastructure | Docker (multi-stage, non-root images), Docker Compose, Kubernetes (local), uv with one lockfile per service |
 
 ## Engineering highlights
 
@@ -65,7 +65,8 @@ The services never call each other over HTTP: Kafka is the only integration chan
 - **Testing pyramid.**
   - *Unit* tests for routes, services, producers and consumers with mocked collaborators.
   - *Integration* tests against real, disposable Kafka brokers and Postgres databases spun up by Testcontainers, covering redelivery after a crash, malformed messages and every denial path.
-- **One-command, reproducible environment.** `docker compose up` starts Kafka, Postgres, idempotent topic/database bootstrapping, migrations, seed data and all services in the right order via health checks and dependency conditions.
+- **One-command, reproducible environment.** From a clean clone, `setup.bat` creates the configuration, installs each service's locked dependencies and starts the whole stack. Docker Compose then brings up Kafka, Postgres, idempotent topic/database bootstrapping, migrations, seed data and all services in the right order via health checks and dependency conditions.
+- **One dependency declaration per service.** A single `pyproject.toml` + `uv.lock` drives the local virtual environment and the Docker images alike, so they can't drift apart. Images are multi-stage, run as a non-root user, and carry no test or migration tooling in the application image.
 - **Graceful shutdown** implemented by hand in the non-HTTP worker (cross-platform signal handling on Linux containers and Windows hosts).
 
 ## Project status
@@ -76,65 +77,110 @@ The services never call each other over HTTP: Kafka is the only integration chan
 | Delivery Service — deliveries, assignment flow, departure planning with OSRM | ✅ Done |
 | Postgres persistence, Alembic migrations, seeding | ✅ Done |
 | Docker Compose & local Kubernetes deployment | ✅ Done |
-| GPS Simulator — departure consumption | ✅ Done |
-| GPS Simulator — persistence & route simulation | 🚧 In progress |
+| GPS Simulator — departure consumption & persistence | ✅ Done |
+| One-command setup, locked dependencies, multi-stage non-root images | ✅ Done |
+| GPS Simulator — route simulation | 🚧 In progress |
 
 **Next on the roadmap:** a `tracking_service` exposing live truck positions over WebSockets, a cross-service end-to-end test suite, observability (Prometheus/Grafana), and a map UI.
 
 ## Getting started
 
-**Prerequisites:** Docker Desktop.
+**Prerequisites** (Windows):
 
-1. Create a `.env` file at the repository root with the database credentials:
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/), installed and running
+- [uv](https://docs.astral.sh/uv/), the Python package manager — it also downloads the right Python version, so no separate Python install is needed:
 
-   ```dotenv
-   POSTGRES_HOST=postgres
-   POSTGRES_PORT=5432
-   POSTGRES_ADMIN_USER=fleetpulse_admin
-   POSTGRES_ADMIN_PASSWORD=change-me
+  ```powershell
+  powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+  ```
 
-   FLEET_SERVICE_DB_USER=fleet_service
-   FLEET_SERVICE_DB_PASSWORD=change-me
-   FLEET_SERVICE_DB_NAME=fleet_service
+### One command from a clean clone
 
-   DELIVERY_SERVICE_DB_USER=delivery_service
-   DELIVERY_SERVICE_DB_PASSWORD=change-me
-   DELIVERY_SERVICE_DB_NAME=delivery_service
+```bat
+git clone https://github.com/Kwuxy/fleetPulse.git
+cd fleetPulse
+setup.bat
+```
 
-   GPS_SIMULATOR_DB_USER=gps_simulator
-   GPS_SIMULATOR_DB_PASSWORD=change-me
-   GPS_SIMULATOR_DB_NAME=gps_simulator
-   ```
+`setup.bat` stops at the first problem and tells you what is missing. In order, it:
 
-2. Start the whole stack:
+1. checks that `uv` is installed and that Docker is running;
+2. creates `.env` from [`.env.example`](.env.example) if you don't have one yet — it never overwrites an existing `.env`;
+3. builds each service's local virtual environment from its lockfile (`uv sync --locked`), which is what the tests and your IDE use;
+4. builds the images and starts the whole stack in the background (`docker compose up --build -d`): Kafka, Postgres, topic and database bootstrapping, migrations, seed data, then the three services.
 
-   ```bash
-   docker compose up --build
-   ```
+The script is safe to run again at any time. The credentials in `.env.example` are for local development only — don't reuse them anywhere else.
 
-3. Explore:
+<details>
+<summary>Without <code>setup.bat</code> (macOS / Linux, or step by step)</summary>
 
-   | URL | What |
-   |---|---|
-   | http://localhost:8001/docs | Fleet Service — interactive API docs |
-   | http://localhost:8002/docs | Delivery Service — interactive API docs |
-   | http://localhost:8080 | Redpanda Console — browse Kafka topics and messages |
+```bash
+cp .env.example .env
+docker compose up --build -d
+# only needed to run the tests or work on the code locally:
+(cd apps/fleet_service && uv sync --locked)
+(cd apps/delivery_service && uv sync --locked)
+(cd apps/gps_simulator && uv sync --locked)
+```
 
-   Try creating a delivery on port 8002, then fetch it again a moment later to see it move from `REQUESTED` to `ASSIGNED`. A ready-to-use [Bruno](https://www.usebruno.com/) collection is available in [`api_collection/`](api_collection).
+</details>
 
-Kubernetes deployment and more options are described in [`infra/DEPLOYMENT.md`](infra/DEPLOYMENT.md).
+### Explore
+
+| URL | What |
+|---|---|
+| http://localhost:8001/docs | Fleet Service — interactive API docs |
+| http://localhost:8002/docs | Delivery Service — interactive API docs |
+| http://localhost:8080 | Redpanda Console — browse Kafka topics and messages |
+
+Check that everything came up with `docker compose ps -a`: the three services, Kafka, Postgres and Redpanda Console should be running, and every `*_init`, `*_migration` and `*_seed` job should show `Exited (0)`. Stop the stack with `docker compose down`.
+
+The databases are reseeded on every start, so anything you create through the API is replaced by the seed data the next time the stack comes up.
+
+### Try the APIs with Bruno
+
+A ready-to-use [Bruno](https://www.usebruno.com/) collection lives in [`api_collection/`](api_collection). Bruno is a free, offline API client that stores collections as plain files, which is why this one is versioned with the code.
+
+1. Install Bruno and choose **Open Collection**, then select the `api_collection` folder.
+2. Select the **local** environment in the top-right dropdown. It defines `FLEET_URL` (`localhost:8001`) and `DELIVERY_URL` (`localhost:8002`), which every request uses.
+3. If Bruno asks which sandbox mode to use, pick **Developer Mode**: the collection runs a small script before each request to generate a random licence plate and tomorrow's date.
+
+Then follow a delivery through the system:
+
+1. **Fleet Service › Get Trucks** — the seeded fleet.
+2. **Fleet Service › Create Truck** — adds a truck with a generated plate number.
+3. **Delivery Service › Create delivery** — books a Brussels → Paris delivery for tomorrow. The response comes back immediately with status `requested`; copy its `id`.
+4. **Delivery Service › Get delivery by id** — paste the `id` into the `id` path parameter and send. A moment later the delivery is `assigned` to a truck, or `denied` with a reason.
+5. **Delivery Service › List Deliveries** — everything, seed data included.
+
+Open Redpanda Console alongside to watch the three Kafka messages that step 3 triggers.
+
+Kubernetes deployment and more detail on how the images are built are in [`infra/DEPLOYMENT.md`](infra/DEPLOYMENT.md).
 
 ## Running the tests
 
-Each service has its own virtual environment. From a service directory:
+The quickest way, from the repository root:
+
+```bat
+run-tests.bat
+```
+
+It runs the three services' suites one after the other and stops at the first failure. Any argument is passed on to `pytest`, which gives two useful shortcuts:
+
+| Command | What it runs |
+|---|---|
+| `run-tests.bat` | Everything, all three services (requires Docker) |
+| `run-tests.bat -m unit` | Unit tests only: a few seconds, no Docker needed |
+| `run-tests.bat -m "not (kafka and integration)"` | Everything except the slower Kafka broker tests |
+ The integration tests start their own disposable Kafka and Postgres containers through Testcontainers, so they need Docker running but not the Compose stack.
+
+To work on a single service, use its own virtual environment (created by `setup.bat`):
 
 ```bash
 cd apps/delivery_service
-.venv/Scripts/python.exe -m pytest test -q                                   # everything (requires Docker)
-.venv/Scripts/python.exe -m pytest test -m unit                              # fast, no external dependency
+uv run pytest test -q            # everything for this service
+uv run pytest test -m routes     # one marker: unit, integration, routes, service, repository, kafka
 ```
-
-Or run both main services' suites sequentially from the root with `./run-tests.bat`.
 
 ## Repository layout
 
@@ -143,10 +189,14 @@ apps/
   fleet_service/      # trucks & assignment (FastAPI)
   delivery_service/   # deliveries, assignment flow, departure planning (FastAPI)
   gps_simulator/      # truck GPS simulation (asyncio worker)
+                      #   each with its own pyproject.toml, uv.lock, Dockerfile and tests
 infra/
   kafka/              # topic creation script
   postgres/           # per-service database/user bootstrap
   k8s/                # local Kubernetes deploy/teardown scripts
 api_collection/       # Bruno API collection
 docker-compose.yml    # full local stack
+setup.bat             # one-command setup from a clean clone
+run-tests.bat         # runs all three test suites sequentially
+.env.example          # local development credentials, copied to .env by setup.bat
 ```
