@@ -2,7 +2,9 @@ x-kafka-bootstrap: &kafka-bootstrap kafka:9092
 
 services:
   fleet_service:
-    build: ./apps/fleet_service
+    build:
+      context: ./apps/fleet_service
+      target: app
     ports:
       - "8001:8001"
     environment:
@@ -29,7 +31,9 @@ services:
         condition: service_completed_successfully
 
   delivery_service:
-    build: ./apps/delivery_service
+    build:
+      context: ./apps/delivery_service
+      target: app
     ports:
       - "8002:8002"
     environment:
@@ -59,7 +63,9 @@ services:
         condition: service_completed_successfully
 
   gps_simulator:
-    build: ./apps/gps_simulator
+    build:
+      context: ./apps/gps_simulator
+      target: app
     environment:
       KAFKA_BOOTSTRAP_SERVERS: *kafka-bootstrap
       POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
@@ -174,7 +180,9 @@ services:
     command: [ ]
 
   fleet_service_migration:
-    build: ./apps/fleet_service
+    build:
+      context: ./apps/fleet_service
+      target: tooling
     environment:
       POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
       POSTGRES_PORT: ${POSTGRES_PORT:-5432}
@@ -187,7 +195,9 @@ services:
         condition: service_completed_successfully
 
   delivery_service_migration:
-    build: ./apps/delivery_service
+    build:
+      context: ./apps/delivery_service
+      target: tooling
     environment:
       POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
       POSTGRES_PORT: ${POSTGRES_PORT:-5432}
@@ -200,7 +210,9 @@ services:
         condition: service_completed_successfully
 
   gps_simulator_migration:
-    build: ./apps/gps_simulator
+    build:
+      context: ./apps/gps_simulator
+      target: tooling
     environment:
       POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
       POSTGRES_PORT: ${POSTGRES_PORT:-5432}
@@ -213,7 +225,9 @@ services:
         condition: service_completed_successfully
 
   fleet_service_seed:
-    build: ./apps/fleet_service
+    build:
+      context: ./apps/fleet_service
+      target: tooling
     environment:
       POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
       POSTGRES_PORT: ${POSTGRES_PORT:-5432}
@@ -228,7 +242,9 @@ services:
         condition: service_completed_successfully
 
   delivery_service_seed:
-    build: ./apps/delivery_service
+    build:
+      context: ./apps/delivery_service
+      target: tooling
     environment:
       POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
       POSTGRES_PORT: ${POSTGRES_PORT:-5432}
@@ -243,7 +259,9 @@ services:
         condition: service_completed_successfully
 
   gps_simulator_seed:
-    build: ./apps/gps_simulator
+    build:
+      context: ./apps/gps_simulator
+      target: tooling
     environment:
       POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
       POSTGRES_PORT: ${POSTGRES_PORT:-5432}
