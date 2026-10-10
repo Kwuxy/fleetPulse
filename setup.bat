@@ -56,7 +56,7 @@ pushd "%PROJECT_ROOT%"
 docker compose up --build -d
 set "COMPOSE_EXIT=%ERRORLEVEL%"
 popd
-if not "%GPS_EXIT%"=="0" goto error
+if not "%COMPOSE_EXIT%"=="0" goto error
 echo [OK] App is up on Docker
 echo.
 
