@@ -2,6 +2,9 @@
 
 **An event-driven microservices backend for a delivery fleet — trucks, deliveries, and (soon) live GPS tracking simulation — built with FastAPI, Kafka and PostgreSQL.**
 
+[![Tests](https://github.com/Kwuxy/fleetPulse/actions/workflows/tests.yml/badge.svg)](https://github.com/Kwuxy/fleetPulse/actions/workflows/tests.yml)
+[![Coverage](https://codecov.io/github/Kwuxy/fleetPulse/graph/badge.svg)](https://codecov.io/github/Kwuxy/fleetPulse)
+
 ![Python](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-async-009688?logo=fastapi&logoColor=white)
 ![Kafka](https://img.shields.io/badge/Apache%20Kafka-KRaft-231F20?logo=apachekafka&logoColor=white)
@@ -54,7 +57,8 @@ The services never call each other over HTTP: Kafka is the only integration chan
 | Messaging | Apache Kafka (KRaft), aiokafka, Redpanda Console |
 | Persistence | PostgreSQL, SQLAlchemy 2 (async, asyncpg), Alembic migrations |
 | External APIs | OSRM routing via httpx |
-| Testing | pytest, pytest-asyncio, Testcontainers (Kafka & Postgres), respx |
+| Testing | pytest, pytest-asyncio, pytest-cov, Testcontainers (Kafka & Postgres), respx |
+| Continuous integration | GitHub Actions, Codecov |
 | Infrastructure | Docker (multi-stage, non-root images), Docker Compose, Kubernetes (local), uv with one lockfile per service |
 
 ## Engineering highlights
@@ -67,6 +71,7 @@ The services never call each other over HTTP: Kafka is the only integration chan
   - *Integration* tests against real, disposable Kafka brokers and Postgres databases spun up by Testcontainers, covering redelivery after a crash, malformed messages and every denial path.
 - **One-command, reproducible environment.** From a clean clone, `setup.bat` creates the configuration, installs each service's locked dependencies and starts the whole stack. Docker Compose then brings up Kafka, Postgres, idempotent topic/database bootstrapping, migrations, seed data and all services in the right order via health checks and dependency conditions.
 - **One dependency declaration per service.** A single `pyproject.toml` + `uv.lock` drives the local virtual environment and the Docker images alike, so they can't drift apart. Images are multi-stage, run as a non-root user, and carry no test or migration tooling in the application image.
+- **Continuous integration.** Every push to `main` and every pull request runs the full test suite on GitHub Actions — the Testcontainers-backed Kafka and Postgres tests included — as one parallel job per service, installing from the lockfile so CI tests exactly the versions the images ship. Branch coverage is measured per service and published to Codecov.
 - **Graceful shutdown** implemented by hand in the non-HTTP worker (cross-platform signal handling on Linux containers and Windows hosts).
 
 ## Project status
@@ -79,6 +84,7 @@ The services never call each other over HTTP: Kafka is the only integration chan
 | Docker Compose & local Kubernetes deployment | ✅ Done |
 | GPS Simulator — departure consumption & persistence | ✅ Done |
 | One-command setup, locked dependencies, multi-stage non-root images | ✅ Done |
+| Continuous integration with coverage reporting | ✅ Done |
 | GPS Simulator — route simulation | 🚧 In progress |
 
 **Next on the roadmap:** a `tracking_service` exposing live truck positions over WebSockets, a cross-service end-to-end test suite, observability (Prometheus/Grafana), and a map UI.
@@ -172,7 +178,9 @@ It runs the three services' suites one after the other and stops at the first fa
 | `run-tests.bat` | Everything, all three services (requires Docker) |
 | `run-tests.bat -m unit` | Unit tests only: a few seconds, no Docker needed |
 | `run-tests.bat -m "not (kafka and integration)"` | Everything except the slower Kafka broker tests |
- The integration tests start their own disposable Kafka and Postgres containers through Testcontainers, so they need Docker running but not the Compose stack.
+| `run-tests.bat --cov` | Everything, plus a coverage table per service |
+
+The integration tests start their own disposable Kafka and Postgres containers through Testcontainers, so they need Docker running but not the Compose stack.
 
 To work on a single service, use its own virtual environment (created by `setup.bat`):
 
@@ -180,7 +188,20 @@ To work on a single service, use its own virtual environment (created by `setup.
 cd apps/delivery_service
 uv run pytest test -q            # everything for this service
 uv run pytest test -m routes     # one marker: unit, integration, routes, service, repository, kafka
+uv run pytest test --cov         # with coverage: lists the lines and branches no test executed
 ```
+
+### Continuous integration and coverage
+
+The [`Tests` workflow](.github/workflows/tests.yml) runs on every push to `main` and on every pull request. It starts one job per service, in parallel, each on its own runner: install from the lockfile (`uv sync --locked`), run the full suite with branch coverage, write the coverage table to the run's summary page, and upload the report to Codecov.
+
+| Service | Coverage |
+|---|---|
+| Fleet Service | [![fleet_service](https://codecov.io/github/Kwuxy/fleetPulse/graph/badge.svg?flag=fleet_service)](https://codecov.io/github/Kwuxy/fleetPulse) |
+| Delivery Service | [![delivery_service](https://codecov.io/github/Kwuxy/fleetPulse/graph/badge.svg?flag=delivery_service)](https://codecov.io/github/Kwuxy/fleetPulse) |
+| GPS Simulator | [![gps_simulator](https://codecov.io/github/Kwuxy/fleetPulse/graph/badge.svg?flag=gps_simulator)](https://codecov.io/github/Kwuxy/fleetPulse) |
+
+The badge at the top of this page is the figure for the whole repository. Coverage counts the lines and branches the tests execute in each service's `app/` package; it shows what no test touches, not how well the rest is checked.
 
 ## Repository layout
 
@@ -195,6 +216,7 @@ infra/
   postgres/           # per-service database/user bootstrap
   k8s/                # local Kubernetes deploy/teardown scripts
 api_collection/       # Bruno API collection
+.github/workflows/    # GitHub Actions: tests and coverage on every push and pull request
 docker-compose.yml    # full local stack
 setup.bat             # one-command setup from a clean clone
 run-tests.bat         # runs all three test suites sequentially
