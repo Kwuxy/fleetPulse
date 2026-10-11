@@ -1,5 +1,5 @@
 import pytest
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, timezone
 from unittest.mock import AsyncMock
 
 from fastapi.testclient import TestClient
@@ -19,7 +19,7 @@ def _get_delivery(**overrides):
         'pickup_location': "Brussels",
         'dropoff_location': "Paris",
         'cargo_weight_kg': 700,
-        'requested_datetime': datetime.today() + timedelta(days=1),
+        'requested_datetime': datetime.now(timezone.utc) + timedelta(days=1),
         'status': DeliveryStatus.REQUESTED,
         'assigned_truck_id': None
     }
@@ -38,7 +38,7 @@ class TestDeliveryRoutes:
                 "pickup_location": "Brussels",
                 "dropoff_location": "Paris",
                 "cargo_weight_kg": 700,
-                "requested_datetime": str(datetime.today() + timedelta(days=1)),
+                "requested_datetime": str(datetime.now(timezone.utc) + timedelta(days=1)),
             }
             defaults.update(overrides)
             return defaults
@@ -82,7 +82,7 @@ class TestDeliveryRoutes:
             (raise_invalid_client, _get_valid_payload()),
             (raise_same_locations, _get_valid_payload(pickup_location='Paris', dropoff_location='Paris')),
             (raise_invalid_cargo, _get_valid_payload(cargo_weight_kg=0)),
-            (raise_invalid_requested_datetime, _get_valid_payload(requested_datetime=str(datetime.today() - timedelta(days=1)))),
+            (raise_invalid_requested_datetime, _get_valid_payload(requested_datetime=str(datetime.now(timezone.utc) - timedelta(days=1)))),
         ])
         def test_create_deliveries_endpoint_rejects_exceptions(self, monkeypatch, side_effect_exception, payload):
             # - Arrange -
@@ -99,6 +99,20 @@ class TestDeliveryRoutes:
 
             # - Assert mock -
             mock_create_delivery.assert_awaited_once_with(request)
+
+        def test_create_delivery_endpoint_rejects_naive_datetime(self, monkeypatch):
+            # - Arrange -
+            delivery = _get_delivery()
+            mock_create_delivery = AsyncMock(return_value=delivery)
+            monkeypatch.setattr(delivery_service, "create_delivery", mock_create_delivery)
+            payload = self._get_valid_payload(requested_datetime=str(datetime.now() + timedelta(days=1)))
+
+            # - Act -
+            response = client.post("/deliveries", json=payload)
+
+            # - Assert result -
+            assert response.status_code == 422
+            mock_create_delivery.assert_not_awaited()
 
     class TestListDeliveriesEndpoint:
         def test_list_deliveries_endpoint_returns_empty_list_when_no_deliveries_exist(self, monkeypatch):

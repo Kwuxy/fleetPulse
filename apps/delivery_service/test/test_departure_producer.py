@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -24,7 +24,7 @@ class TestDepartureProducer:
                 truck_id="truck-zyx987",
                 pickup_location=Coordinates(lat=123.456, lon=789.012),
                 dropoff_location=Coordinates(lat=456.789, lon=123.456),
-                departure_time=datetime.now() + timedelta(minutes=50),
+                departure_time=datetime.now(timezone.utc) + timedelta(minutes=50),
             )
 
             # - Act -
@@ -52,7 +52,7 @@ class TestDepartureProducer:
                 truck_id="truck-zyx987",
                 pickup_location=Coordinates(lat=123.456, lon=789.012),
                 dropoff_location=Coordinates(lat=456.789, lon=123.456),
-                departure_time=datetime.now() + timedelta(minutes=50),
+                departure_time=datetime.now(timezone.utc) + timedelta(minutes=50),
             )
 
             # - Act -

@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, call
 
 import pytest
@@ -18,7 +18,7 @@ def _get_truck_departure_scheduled_message():
         "truck_id": "truck-zyx987",
         "pickup_location": {"lat": 48.8566, "lon": 2.3522},
         "dropoff_location": {"lat": 45.764, "lon": 4.8357},
-        "departure_time": "2026-09-20T10:00:00",
+        "departure_time": "2026-09-20T10:00:00+00:00",
     }
 
 
@@ -28,7 +28,7 @@ def _get_truck_departure_scheduled():
         truck_id="truck-zyx987",
         pickup_location=Coordinates(lat=48.8566, lon=2.3522),
         dropoff_location=Coordinates(lat=45.764, lon=4.8357),
-        departure_time=datetime(2026, 9, 20, 10, 0, 0),
+        departure_time=datetime(2026, 9, 20, 10, 0, 0, tzinfo=timezone.utc),
     )
 
 

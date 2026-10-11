@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.producers import assignment_producer, departure_producer
 from app.exceptions import InvalidClient, SameLocationsException, InvalidCargo, InvalidRequestedDate, NotFoundException, \
@@ -78,7 +78,7 @@ def _cargo_is_valid(cargo_weight_kg: int) -> bool:
     return cargo_weight_kg > 0
 
 def _date_is_valid(requested_datetime: datetime) -> bool:
-    return requested_datetime > datetime.today()
+    return requested_datetime > datetime.now(timezone.utc)
 
 def _generate_delivery_id():
     return f"delivery-{uuid.uuid4().hex[:8]}"

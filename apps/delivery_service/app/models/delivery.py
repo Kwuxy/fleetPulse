@@ -1,6 +1,5 @@
-from datetime import datetime
 from enum import Enum
-from pydantic import BaseModel
+from pydantic import BaseModel, AwareDatetime
 
 
 class DeliveryStatus(str, Enum):
@@ -21,7 +20,7 @@ class Delivery(BaseModel):
     pickup_location: str
     dropoff_location: str
     cargo_weight_kg: int
-    requested_datetime: datetime
+    requested_datetime: AwareDatetime
     status: DeliveryStatus
     assigned_truck_id: str | None
     denial_reason: DeliveryDenialReason | None = None
@@ -32,4 +31,4 @@ class CreateDeliveryRequest(BaseModel):
     pickup_location: str
     dropoff_location: str
     cargo_weight_kg: int
-    requested_datetime: datetime
+    requested_datetime: AwareDatetime

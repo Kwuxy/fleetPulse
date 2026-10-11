@@ -1,5 +1,4 @@
-from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, AwareDatetime
 
 
 class Coordinates(BaseModel):
@@ -12,4 +11,4 @@ class TruckDepartureScheduled(BaseModel):
     truck_id: str
     pickup_location: Coordinates
     dropoff_location: Coordinates
-    departure_time: datetime
+    departure_time: AwareDatetime

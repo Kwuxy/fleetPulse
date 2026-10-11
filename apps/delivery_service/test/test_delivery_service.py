@@ -1,5 +1,5 @@
 import asyncio
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, timezone
 from unittest.mock import AsyncMock, Mock
 
 import pytest
@@ -38,7 +38,7 @@ class TestDeliveryService:
                 pickup_location="Brussels",
                 dropoff_location="Paris",
                 cargo_weight_kg=700,
-                requested_datetime=datetime.today() + timedelta(days=1),
+                requested_datetime=datetime.now(timezone.utc) + timedelta(days=1),
             )
             defaults.update(overrides)
             return CreateDeliveryRequest(**defaults)
@@ -113,7 +113,7 @@ class TestDeliveryService:
                                                                  mock_save_delivery
                                                                  ):
             # - Arrange -
-            request = self._get_create_delivery_request(requested_datetime=datetime.today())
+            request = self._get_create_delivery_request(requested_datetime=datetime.now(timezone.utc))
 
             # - Act -
             with pytest.raises(InvalidRequestedDate):
@@ -319,7 +319,7 @@ class TestDeliveryService:
             pickup_location="Brussels",
             dropoff_location="Paris",
             cargo_weight_kg=700,
-            requested_datetime=datetime.today() + timedelta(days=1),
+            requested_datetime=datetime.now(timezone.utc) + timedelta(days=1),
             status=DeliveryStatus.REQUESTED,
             assigned_truck_id=None
         )
