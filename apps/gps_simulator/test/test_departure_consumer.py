@@ -88,3 +88,20 @@ class TestDepartureConsumer:
 
             # - Assert mock calls -
             mock_create_journey.assert_not_awaited()
+
+        def test_returns_consumed_without_creating_journey_on_naive_departure_time(self, monkeypatch):
+            # - Arrange -
+            mock_create_journey = AsyncMock()
+            monkeypatch.setattr(journey_service, "create_journey", mock_create_journey)
+
+            msg = _get_truck_departure_scheduled_message()
+            msg["departure_time"] = "2026-09-20T10:00:00"  # no UTC offset
+
+            # - Act -
+            result = asyncio.run(departure_consumer.handle_truck_departure_scheduled(msg))
+
+            # - Assert Result -
+            assert result == QueueMessageStatus.CONSUMED
+
+            # - Assert mock calls -
+            mock_create_journey.assert_not_awaited()

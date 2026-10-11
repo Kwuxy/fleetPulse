@@ -83,3 +83,18 @@ class TestJourneyRepository:
         assert journey is not None
         assert journey == journeys[1]
         assert len(saved_journeys) == 1  # No duplication
+
+    async def test_save_journey_keeps_departure_instant_and_returns_it_in_utc(self):
+        # - Arrange -
+        departure_time = datetime(2026, 9, 20, 12, 0, 0, tzinfo=timezone(timedelta(hours=2)))
+        journey = _get_journey(departure_time=departure_time)
+
+        await journey_repository.save_journey(journey)
+
+        # - Act -
+        result = await journey_repository.get_journey_by_delivery_id("delivery-123")
+
+        # - Assert -
+        assert result is not None
+        assert result.departure_time == departure_time  # Same instant
+        assert result.departure_time.utcoffset() == timedelta(0)  # Normalised to UTC by Postgres
