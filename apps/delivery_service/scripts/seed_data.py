@@ -1,7 +1,7 @@
 import asyncio
 import os
 import random
-from datetime import date, timedelta
+from datetime import timedelta, datetime, timezone
 from functools import cache
 from pathlib import Path
 
@@ -75,6 +75,9 @@ def _get_location_pair() -> dict[str, str]:
 
 def _get_deliveries(nb: int, **overrides) -> list[Delivery]:
     res = []
+    start_utc = datetime.now(timezone.utc).replace(second=0, microsecond=0) + timedelta(minutes=5)
+    end_utc = start_utc.replace(hour=9, minute=0) + timedelta(days=1)
+    time_between_deliveries = (end_utc - start_utc) / nb
     for i in range(nb):
         locations = _get_location_pair()
         weight_type = [x[1] for x in WEIGHT_REPARTITION if x[0] > i / nb][0]
@@ -85,7 +88,7 @@ def _get_deliveries(nb: int, **overrides) -> list[Delivery]:
             'pickup_location': locations['pickup'],
             'dropoff_location': locations['dropoff'],
             'cargo_weight_kg': _get_delivery_cargo_weight_kg(weight_type),
-            'requested_datetime': date.today() + timedelta(days=1),
+            'requested_datetime': start_utc + i * time_between_deliveries,
             'status': DeliveryStatus.REQUESTED,
             'assigned_truck_id': None,
             'denial_reason': None,
@@ -98,7 +101,7 @@ def _get_deliveries(nb: int, **overrides) -> list[Delivery]:
                 default['assigned_truck_id'] = _get_next_truck_id()
             case DeliveryStatus.COMPLETED:
                 default['assigned_truck_id'] = _get_next_truck_id()
-                default['requested_datetime'] = date.today() - timedelta(days=1)
+                default['requested_datetime'] = default['requested_datetime'] - timedelta(days=2)
             case DeliveryStatus.DENIED:
                 default['denial_reason'] = denial_type['reason']
                 default['denial_description'] = denial_type['description']
