@@ -187,7 +187,7 @@ To work on a single service, use its own virtual environment (created by `setup.
 ```bash
 cd apps/delivery_service
 uv run pytest test -q            # everything for this service
-uv run pytest test -m routes     # one marker: unit, integration, routes, service, repository, kafka
+uv run pytest test -m routes     # one marker: unit, integration, routes, service, repository, kafka, migration
 uv run pytest test --cov         # with coverage: lists the lines and branches no test executed
 ```
 
