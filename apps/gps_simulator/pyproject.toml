@@ -16,6 +16,7 @@ asyncio_mode = "strict"
 markers = [
     "service: tests for service-layer business logic",
     "repository: tests for repository/storage behavior",
+    "migration: tests for migrations behavior",
     "unit: fast isolated tests",
     "integration: tests involving multiple layers or external systems",
     "kafka: tests involving Kafka producer/consumer behavior",
