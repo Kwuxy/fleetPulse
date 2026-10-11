@@ -90,7 +90,7 @@ services:
         condition: service_completed_successfully
 
   kafka:
-    image: confluentinc/cp-kafka:latest
+    image: confluentinc/cp-kafka:8.3.1
     ports:
       - "9094:9094"
     environment:
@@ -115,7 +115,7 @@ services:
     # TODO : Add volumes for data persistence
 
   kafka_init:
-    image: confluentinc/cp-kafka:latest
+    image: confluentinc/cp-kafka:8.3.1
     environment:
       KAFKA_BOOTSTRAP_SERVERS: *kafka-bootstrap
     depends_on:
