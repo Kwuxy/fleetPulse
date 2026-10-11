@@ -20,13 +20,23 @@ def empty_postgres_db(monkeypatch):
 @pytest.mark.integration
 class TestMigrations:
     def test_migrated_schema_matches_orm_models(self, empty_postgres_db):
+        # - Arrange -
         cfg = Config("alembic.ini")
+
+        # - Act -
         command.upgrade(cfg, "head")
+
+        # - Assert -
         command.check(cfg)
 
     def test_downgrade_schema_matches_orm_models(self, empty_postgres_db):
+        # - Arrange -
         cfg = Config("alembic.ini")
+
+        # - Act -
         command.upgrade(cfg, "head")
         command.downgrade(cfg, "base")
         command.upgrade(cfg, "head")
+
+        # - Assert -
         command.check(cfg)
